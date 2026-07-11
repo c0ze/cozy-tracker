@@ -123,6 +123,20 @@ Idioms that make it sound like tracker music (all seen in corpus):
 Effect frequency in corpus (XM letters → IT equivalent): arpeggio 0→`J` (by far #1),
 vibrato 4→`H`, tone porta 3→`G`, set vol C→vol column, vol slide A→`D`, porta 1/2→`F/E`.
 
+## Deep-dive technique library
+
+`docs/corpus-studies.md` holds pattern-level studies of three contrasting
+Drozerix modules with adoptable recipes: **her_kiss** (melodic chip-pop:
+liquid-harp channel, chord-carrying melody, bass-as-drums, chorus-first
+re-orchestration), **war_path** (aggressive: choked octave bass,
+ghost-accent snare march, drone + bVII turnaround, canon echo, pump pad),
+**sleepy_snow** (ambient: slow clock, split arpeggios, channel echo
+cascades, shimmer-hold vibrato, phrase-length patterns, exhale cells).
+Read it before composing; reference implementations live in
+songs/paper_hearts.gen.js, songs/siege_engine.gen.js, songs/winter_orbit.gen.js.
+Shared note-math/melody helpers: songs/lib.js. Synth waves now include
+"pluck" (tuned music-box bell with natural decay).
+
 ## Composing full tracks: use a generator script
 
 Hand-writing 64-row × 10-channel patterns as JSON does not scale. Write a

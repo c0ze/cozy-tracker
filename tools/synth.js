@@ -58,6 +58,26 @@ export function synthesize(spec) {
     return { samplerate, channels: [data], volume: spec.volume };
   }
 
+  if (wave === "pluck") {
+    // music-box / bell: sine + decaying upper harmonics, natural release.
+    // Tuned so C-5 = middle C (generated at 261.6 Hz, c5speed = samplerate).
+    const samplerate = spec.samplerate || 22050;
+    const n = Math.round((spec.seconds || 2) * samplerate);
+    const decay = spec.decay === undefined ? 2.5 : spec.decay;
+    const f = MIDDLE_C;
+    const data = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / samplerate;
+      const w = 2 * Math.PI * f * t;
+      data[i] = (Math.sin(w)
+        + 0.5 * Math.sin(2 * w) * Math.exp(-6 * t)
+        + 0.25 * Math.sin(3 * w) * Math.exp(-10 * t)
+        + 0.1 * Math.sin(5.4 * w) * Math.exp(-14 * t)) // slightly inharmonic partial = bell
+        * Math.exp(-decay * t) * 0.55;
+    }
+    return { samplerate, c5speed: samplerate, channels: [data], volume: spec.volume };
+  }
+
   if (wave === "kick") {
     const samplerate = spec.samplerate || 22050;
     const n = Math.round((spec.seconds || 0.25) * samplerate);
