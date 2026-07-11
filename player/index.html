@@ -469,6 +469,34 @@ function delNote() {
   updateEditState();
 }
 
+// entering a channel selects the instrument that channel plays
+// (nearest event with an instrument in the current pattern, else any pattern)
+function instForChannel(ch) {
+  const scan = (pat) => {
+    const chn = pat.channels[ch];
+    if (!chn) return undefined;
+    let best, bestDist = Infinity;
+    for (const [r, ev] of Object.entries(chn)) {
+      if (ev.instrument === undefined) continue;
+      const d = Math.abs(+r - cursor.row);
+      if (d < bestDist) { bestDist = d; best = ev.instrument; }
+    }
+    return best;
+  };
+  let inst = scan(jsonPattern());
+  if (inst === undefined) for (const p of edit.json.patterns) { inst = scan(p); if (inst !== undefined) break; }
+  return inst;
+}
+function syncInstToChannel() {
+  if (!edit) return;
+  const inst = instForChannel(cursor.ch);
+  if (inst !== undefined && inst < edit.json.samples.length) {
+    curInst = inst;
+    $('instSel').value = curInst;
+    updateEditState();
+  }
+}
+
 // keyboard piano: two.5 octaves, FT2/IT layout
 const PIANO = {
   z: 0, s: 1, x: 2, d: 3, c: 4, v: 5, g: 6, b: 7, h: 8, n: 9, j: 10, m: 11, ',': 12,
@@ -668,7 +696,11 @@ patC.addEventListener('mousedown', (e) => {
   const row = Math.round(dispRow + (y - centerY) / rowH);
   const ch = Math.floor((x - rowNumW) / chW);
   const pat = song.patterns[viewPattern()];
-  if (row >= 0 && row < pat.rows.length && ch >= 0 && ch < nCh) cursor = { row, ch };
+  if (row >= 0 && row < pat.rows.length && ch >= 0 && ch < nCh) {
+    const chChanged = ch !== cursor.ch;
+    cursor = { row, ch };
+    if (chChanged) syncInstToChannel();
+  }
 });
 
 // ---------- keyboard ----------
@@ -695,8 +727,8 @@ addEventListener('keydown', async (e) => {
   switch (e.key) {
     case 'ArrowUp': e.preventDefault(); cursor.row = (cursor.row - 1 + pat.rows.length) % pat.rows.length; return;
     case 'ArrowDown': e.preventDefault(); cursor.row = (cursor.row + 1) % pat.rows.length; return;
-    case 'ArrowLeft': e.preventDefault(); cursor.ch = (cursor.ch - 1 + nCh) % nCh; return;
-    case 'ArrowRight': e.preventDefault(); cursor.ch = (cursor.ch + 1) % nCh; return;
+    case 'ArrowLeft': e.preventDefault(); cursor.ch = (cursor.ch - 1 + nCh) % nCh; syncInstToChannel(); return;
+    case 'ArrowRight': e.preventDefault(); cursor.ch = (cursor.ch + 1) % nCh; syncInstToChannel(); return;
     case 'PageUp': e.preventDefault(); cursor.row = Math.max(0, cursor.row - 16); return;
     case 'PageDown': e.preventDefault(); cursor.row = Math.min(pat.rows.length - 1, cursor.row + 16); return;
     case 'Home': e.preventDefault(); cursor.row = 0; return;
