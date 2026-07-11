@@ -1,0 +1,4 @@
+path,source_url,author,license,downloaded,sha256,notes
+library/samples/akwf/,https://github.com/KristofferKarlAxelEkstrand/AKWF-FREE,Kristoffer Ekstrand (Adventure Kid),Public Domain,2026-07-12,git-clone,"~4k single-cycle waveforms, 43649 wav files incl. variants"
+library/samples/sagamusix/,https://sagamusix.de/en/samples/,Saga Musix,"Free use, credits not required",2026-07-12,zips,"9 packs: bass, bass_drums, drums, fx, pads_strings, powerchords, synths, tr-808, tr-909; note 808/909 sampled from Roland hardware"
+library/modules/drozerix/,https://modarchive.org/index.php?request=view_profile&query=84702,Drozerix,"Public Domain (explicit blanket grant on profile)",2026-07-12,manual,"77 modules xm/mod/it; pattern data PD, audit samples before commercial reuse"

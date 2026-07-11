@@ -1,0 +1,8 @@
+node_modules/
+build/
+.DS_Store
+
+# bulk assets stay out of git — see library/README.md
+library/*
+!library/README.md
+!library/ledger.csv
