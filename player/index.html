@@ -400,6 +400,50 @@ function syncCell(patIdx, row, ch) {
   }
 }
 
+// ---------- note audition (WebAudio preview of the entered note) ----------
+const bufCache = new Map();
+let auditionStop = null;
+async function auditionNote(noteName, instIdx, volStr) {
+  try {
+    const def = edit.json.samples[instIdx];
+    if (!def || !player) return;
+    if (player.context.state === 'suspended') await player.context.resume();
+    const s = await resolveSample(def);
+    const key = JSON.stringify(def);
+    let buf = bufCache.get(key);
+    if (!buf) {
+      buf = player.context.createBuffer(s.channels.length, s.channels[0].length, s.samplerate);
+      s.channels.forEach((chData, i) => buf.copyToChannel(Float32Array.from(chData), i));
+      bufCache.set(key, buf);
+    }
+    // pitch: C-5 plays at c5speed; each semitone is a factor of 2^(1/12)
+    const semi = NOTE_NAMES.indexOf(noteName.slice(0, 2)) + 12 * parseInt(noteName[2]) - 60;
+    const rate = ((s.c5speed || s.samplerate) * Math.pow(2, semi / 12)) / s.samplerate;
+
+    if (auditionStop) auditionStop(); // cut previous preview
+    const src = player.context.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    const g = player.context.createGain();
+    const vol = (s.volume ?? 64) / 64 * (volStr ? parseInt(volStr.slice(1)) / 64 : 0.75) * 0.6;
+    g.gain.value = vol;
+    src.connect(g); g.connect(player.gain);
+    const t = player.context.currentTime;
+    if (s.loop) {
+      src.loop = true;
+      src.loopStart = (s.loop.start || 0) / s.samplerate;
+      src.loopEnd = (s.loop.end ?? buf.length) / s.samplerate;
+      g.gain.setValueAtTime(vol, t + 0.3);
+      g.gain.linearRampToValueAtTime(0, t + 0.4); // short release, no clicks
+      src.start(t); src.stop(t + 0.45);
+    } else {
+      src.start(t); src.stop(t + Math.min(buf.duration / rate, 2));
+    }
+    auditionStop = () => { try { g.gain.cancelScheduledValues(0); g.gain.value = 0; src.stop(); } catch {} };
+    src.onended = () => { if (g) g.disconnect(); };
+  } catch { /* audition is best-effort */ }
+}
+
 // ---------- edit operations ----------
 function jsonPattern() { return edit.json.patterns[viewPattern()]; }
 function ensureChannel(pat, ch) {
@@ -414,6 +458,7 @@ function setNote(noteName) {
     : { ...old, note: noteName, instrument: curInst, vol: old.vol || 'v48' };
   edit.dirty = true;
   syncCell(viewPattern(), cursor.row, cursor.ch);
+  if (noteName !== '==') auditionNote(noteName, curInst, chn[cursor.row].vol);
   cursor.row = Math.min((pat.rows || 64) - 1, cursor.row + 1);
   updateEditState();
 }
