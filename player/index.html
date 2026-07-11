@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #0d0f14; --panel: #151821; --panel2: #1b1f2b; --text: #d7dae0; --dim: #6b7280;
-    --accent: #4fc1ff; --playhead: #ffffff;
+    --accent: #4fc1ff; --edit: #e0a458;
   }
   * { box-sizing: border-box; }
   body {
@@ -24,15 +24,16 @@
     border-radius: 6px; padding: .3rem .8rem; font: inherit; cursor: pointer;
   }
   button:hover { border-color: var(--accent); }
-  input[type=text] {
+  button.on { border-color: var(--edit); color: var(--edit); }
+  button:disabled { opacity: .4; cursor: default; }
+  input[type=text], select {
     background: #0a0c10; color: var(--text); border: 1px solid #333a4d;
-    border-radius: 6px; padding: .3rem .5rem; font: inherit; flex: 1; min-width: 160px;
+    border-radius: 6px; padding: .3rem .5rem; font: inherit;
   }
   input[type=range] { accent-color: var(--accent); }
   label { color: var(--dim); font-size: 11px; }
   #pos { color: var(--accent); min-width: 15ch; }
-  #title { color: var(--text); }
-  /* order strip */
+  #editState { color: var(--edit); font-size: 11px; }
   #order { display: flex; gap: 3px; flex-wrap: wrap; }
   .ord {
     min-width: 26px; text-align: center; padding: 2px 4px; border-radius: 4px;
@@ -40,59 +41,90 @@
     border: 1px solid transparent;
   }
   .ord.cur { color: #fff; border-color: var(--accent); background: #1e3a52; }
-  /* canvases */
-  #scope { width: 100%; height: 56px; display: block; border-radius: 8px; background: var(--panel); }
+  .ord.sel { border-color: var(--edit); }
+  #scope { width: 100%; height: 48px; display: block; border-radius: 8px; background: var(--panel); }
   #patwrap { flex: 1; min-height: 0; position: relative; }
   #pat { width: 100%; height: 100%; display: block; border-radius: 8px; background: var(--panel); }
   #drop { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(13,15,20,.85); border: 2px dashed var(--accent); border-radius: 8px;
     color: var(--accent); font-size: 1.1rem; pointer-events: none; }
-  #meta { color: var(--dim); font-size: 11px; white-space: pre-wrap; max-height: 60px; overflow-y: auto; }
+  #meta { color: var(--dim); font-size: 11px; white-space: pre-wrap; max-height: 44px; overflow-y: auto; }
+  #instBar { display: none; }
+  #instBar.show { display: flex; }
 </style>
 </head>
 <body>
 <div class="row" style="justify-content: space-between">
   <h1>MOD_MUSIC <small>· tracker</small> <span id="title"></span></h1>
+  <span id="editState"></span>
   <span id="pos">--:-- · ord -/- · row --</span>
 </div>
 
 <div class="panel row">
-  <button id="play">▶</button>
-  <button id="stop">■</button>
-  <input type="range" id="seek" min="0" max="100" step="0.1" value="0" style="flex:2; min-width:120px">
-  <label>vol</label><input type="range" id="vol" min="0" max="1.5" step="0.01" value="1" style="width:70px">
-  <label>tempo</label><input type="range" id="tempo" min="0.5" max="2" step="0.05" value="1" style="width:70px">
-  <label>pitch</label><input type="range" id="pitch" min="0.5" max="2" step="0.05" value="1" style="width:70px">
-  <button id="reset" style="font-size:11px">reset</button>
-  <input type="text" id="url" value="../build/first_light.it">
+  <button id="play" title="play / resume">▶</button>
+  <button id="pause" title="pause (space)">⏸</button>
+  <button id="stop" title="stop">■</button>
+  <button id="edit" title="toggle edit mode (json songs only)">✎ edit</button>
+  <input type="range" id="seek" min="0" max="100" step="0.1" value="0" style="flex:2; min-width:100px">
+  <label>vol</label><input type="range" id="vol" min="0" max="1.5" step="0.01" value="1" style="width:60px">
+  <label>tempo</label><input type="range" id="tempo" min="0.5" max="2" step="0.05" value="1" style="width:60px">
+  <label>pitch</label><input type="range" id="pitch" min="0.5" max="2" step="0.05" value="1" style="width:60px">
+  <input type="text" id="url" value="../songs/first_light.json" style="flex:1; min-width:150px">
   <button id="loadUrl">Load</button>
-  <input type="file" id="file" accept=".it,.xm,.mod,.s3m,.mptm,.med,.umx" style="font-size:11px">
+  <input type="file" id="file" accept=".it,.xm,.mod,.s3m,.json" style="font-size:11px; max-width:180px">
 </div>
 
-<div class="panel" id="orderPanel"><div id="order"></div></div>
+<div class="panel row" id="instBar">
+  <label>instrument</label>
+  <select id="instSel" style="min-width:180px"></select>
+  <input type="text" id="instPath" placeholder="library/samples/….wav" style="flex:1; min-width:160px">
+  <label><input type="checkbox" id="instLoop" checked> single-cycle loop</label>
+  <button id="instAdd">+ add</button>
+  <input type="file" id="instFile" accept=".wav" style="font-size:11px; max-width:160px">
+  <button id="instDel">✕ remove</button>
+  <span style="flex:1"></span>
+  <button id="dlJson">⬇ json</button>
+  <button id="dlIt">⬇ .it</button>
+</div>
+
+<div class="panel"><div id="order"></div></div>
 <canvas id="scope"></canvas>
 <div id="patwrap">
   <canvas id="pat"></canvas>
   <div id="drop">drop a module</div>
 </div>
-<div class="panel" id="meta">no module loaded — Load a URL or drop a .it/.xm/.mod file</div>
+<div class="panel" id="meta">no module loaded — Load a URL (.it to view, .json to edit) or drop a file</div>
 
 <script type="module">
 import { ChiptuneJsPlayer } from './vendor/chiptune3/chiptune3.js';
+import itwriter from '/vendor/itwriter/index.js';
+import { synthesize } from '/tools/synth.js';
+import { readWav } from '/tools/wav.js';
 
 const $ = (id) => document.getElementById(id);
-let player = null, ready = false, started = false, seeking = false;
-let song = null;          // meta.song: channels, patterns (formatted cells), orders
-let orders = [];          // pattern index per order pos
+const MIDDLE_C = 261.6256;
+
+// ---------- player state ----------
+let player = null, ready = false, started = false, paused = false, seeking = false;
+let song = null;          // worklet meta.song: channels[], patterns[{rows:[[cellStr,…]]}], orders[]
+let orders = [];
 let cur = { order: 0, pattern: 0, row: 0, pos: 0 };
-let dispRow = 0;          // smoothed row for scrolling
-let vu = [];              // latest per-channel {left,right}
-let vuDisp = [];          // decaying display values
+let dispRow = 0;
+let vu = [], vuDisp = [];
 let analyser = null, scopeData = null;
 
-// channel hues — stable, readable on dark
+// ---------- edit state ----------
+let edit = null;          // { json, url, dirty } — present when a .json song is loaded
+let editMode = false;
+let cursor = { row: 0, ch: 0 };
+let selOrder = 0;         // selected order slot (which pattern we edit/play)
+let octave = 5;
+let curInst = 0;
+const sampleCache = new Map(); // resolved sample defs (fetch/synth) keyed by def JSON
+
 const hue = (i) => (i * 47 + 190) % 360;
 const chColor = (i, l = 65, a = 1) => `hsla(${hue(i)}, 75%, ${l}%, ${a})`;
+const fmt = (s) => (s === undefined || isNaN(s)) ? '--:--' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 function initPlayer() {
   player = new ChiptuneJsPlayer({ repeatCount: -1 });
@@ -104,7 +136,6 @@ function initPlayer() {
     player.gain.connect(analyser);
   });
   player.onError((e) => { $('meta').textContent = 'error: ' + JSON.stringify(e); });
-
   player.onMetadata((meta) => {
     song = meta.song || {};
     orders = (song.orders || []).map((o) => o.pat);
@@ -117,20 +148,18 @@ function initPlayer() {
     patCache.clear();
     buildOrderStrip();
   });
-
   player.onProgress((d) => {
     if (!started) return;
     cur = d;
     vu = d.vu || [];
     $('pos').textContent = `${fmt(d.pos)} · ord ${d.order}/${orders.length - 1} · row ${String(d.row).padStart(2, '0')}`;
     if (!seeking) $('seek').value = d.pos;
+    if (editMode) selOrder = d.order;
     markOrder(d.order);
   });
 }
 
-const fmt = (s) => (s === undefined || isNaN(s)) ? '--:--' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-
-// --- order strip ---
+// ---------- order strip ----------
 function buildOrderStrip() {
   const el = $('order');
   el.innerHTML = '';
@@ -139,15 +168,24 @@ function buildOrderStrip() {
     d.className = 'ord';
     d.textContent = pat;
     d.title = `order ${i} → pattern ${pat}`;
-    d.onclick = () => { if (player && started) player.setOrderRow(i, 0); };
+    d.onclick = () => {
+      selOrder = i;
+      cursor.row = 0;
+      if (player && started) player.setOrderRow(i, 0);
+      markOrder(cur.order);
+    };
     el.appendChild(d);
   });
+  markOrder(cur.order);
 }
 function markOrder(o) {
-  [...$('order').children].forEach((d, i) => d.classList.toggle('cur', i === o));
+  [...$('order').children].forEach((d, i) => {
+    d.classList.toggle('cur', i === o && started);
+    d.classList.toggle('sel', editMode && i === selOrder);
+  });
 }
 
-// --- canvas setup ---
+// ---------- canvases ----------
 const patC = $('pat'), scopeC = $('scope');
 function fitCanvas(c) {
   const r = c.getBoundingClientRect();
@@ -158,14 +196,16 @@ function fitCanvas(c) {
   return { w: r.width, h: r.height, dpr };
 }
 
-// cell format from libopenmpt (width 13): "NNN IIvVV FFP" — slice into segments
 const SEG = [[0, 3], [4, 6], [6, 9], [10, 13]];
 const SEGCOLOR = (i, chIdx) => [chColor(chIdx), '#8b93a7', '#7ec699', '#e0a458'][i];
+const LAYOUT = { rowH: 17, headH: 34, rowNumW: 34 };
 
-// patterns are pre-rendered once to offscreen canvases; per-frame work is
-// just blitting at the scroll offset plus playhead/header/VU overlays.
 const patCache = new Map();
-function patternCanvas(patIdx, chW, nCh, rowH, rowNumW, dpr) {
+function invalidatePattern(patIdx) {
+  for (const k of [...patCache.keys()]) if (k.startsWith(patIdx + ':')) patCache.delete(k);
+}
+function patternCanvas(patIdx, chW, nCh, dpr) {
+  const { rowH, rowNumW } = LAYOUT;
   const key = `${patIdx}:${Math.round(chW)}:${dpr}`;
   if (patCache.has(key)) return patCache.get(key);
   const pat = song.patterns[patIdx];
@@ -174,8 +214,7 @@ function patternCanvas(patIdx, chW, nCh, rowH, rowNumW, dpr) {
   c.height = Math.round(pat.rows.length * rowH * dpr);
   const ctx = c.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const font = `${Math.min(13, chW / 9.2)}px ui-monospace, Menlo, monospace`;
-  ctx.font = font;
+  ctx.font = `${Math.min(13, chW / 9.2)}px ui-monospace, Menlo, monospace`;
   ctx.textBaseline = 'middle';
   for (let r = 0; r < pat.rows.length; r++) {
     const y = r * rowH + rowH / 2;
@@ -206,6 +245,13 @@ function patternCanvas(patIdx, chW, nCh, rowH, rowNumW, dpr) {
   return c;
 }
 
+function viewPattern() {
+  if (!song || !song.patterns?.length) return 0;
+  const p = editMode ? (orders[selOrder] ?? 0) : cur.pattern;
+  return Math.min(p, song.patterns.length - 1);
+}
+const playing = () => started && !paused;
+
 function drawPattern() {
   const { w, h, dpr } = fitCanvas(patC);
   const ctx = patC.getContext('2d');
@@ -213,48 +259,53 @@ function drawPattern() {
   ctx.clearRect(0, 0, w, h);
   if (!song || !song.patterns || !song.patterns.length) return;
 
-  const patIdx = Math.min(cur.pattern, song.patterns.length - 1);
+  const patIdx = viewPattern();
   const pat = song.patterns[patIdx];
   const nCh = (song.channels || []).length;
-  const rowH = 17, headH = 34, rowNumW = 34;
+  const { rowH, headH, rowNumW } = LAYOUT;
   const chW = Math.max(112, (w - rowNumW - 8) / nCh);
 
-  // smooth scroll toward current row
-  const target = cur.row;
+  const target = (editMode && !playing()) ? cursor.row : cur.row;
   dispRow += (target - dispRow) * 0.35;
   if (Math.abs(target - dispRow) > 12) dispRow = target;
 
   const centerY = headH + (h - headH) / 2;
 
-  // blit pre-rendered pattern at scroll offset
-  const img = patternCanvas(patIdx, chW, nCh, rowH, rowNumW, dpr);
+  const img = patternCanvas(patIdx, chW, nCh, dpr);
   const srcY = (dispRow * rowH + rowH / 2) * dpr - (centerY - headH) * dpr;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(img,
-    0, srcY, img.width, (h - headH) * dpr,
-    0, headH * dpr, img.width, (h - headH) * dpr);
+  ctx.drawImage(img, 0, srcY, img.width, (h - headH) * dpr, 0, headH * dpr, img.width, (h - headH) * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // playhead
+  // playhead band
   const phY = centerY;
   const grad = ctx.createLinearGradient(0, phY - rowH, 0, phY + rowH);
-  grad.addColorStop(0, 'rgba(79,193,255,0)');
-  grad.addColorStop(0.5, 'rgba(79,193,255,.16)');
-  grad.addColorStop(1, 'rgba(79,193,255,0)');
+  const col = editMode && !playing() ? '224,164,88' : '79,193,255';
+  grad.addColorStop(0, `rgba(${col},0)`);
+  grad.addColorStop(0.5, `rgba(${col},.14)`);
+  grad.addColorStop(1, `rgba(${col},0)`);
   ctx.fillStyle = grad;
   ctx.fillRect(0, phY - rowH, w, rowH * 2);
-  ctx.fillStyle = 'rgba(79,193,255,.9)';
+  ctx.fillStyle = `rgba(${col},.9)`;
   ctx.fillRect(0, phY - rowH / 2, 3, rowH);
   ctx.fillRect(w - 3, phY - rowH / 2, 3, rowH);
 
-  // channel header (drawn last, opaque above scrolling rows)
+  // edit cursor cell
+  if (editMode) {
+    const cy = centerY + (cursor.row - dispRow) * rowH;
+    const cx = rowNumW + cursor.ch * chW;
+    ctx.strokeStyle = 'rgba(224,164,88,.95)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cx + 2, cy - rowH / 2 + 1, chW - 6, rowH - 2);
+  }
+
+  // header
   ctx.fillStyle = '#11141c';
   ctx.fillRect(0, 0, w, headH);
   ctx.strokeStyle = 'rgba(255,255,255,.08)';
   ctx.beginPath(); ctx.moveTo(0, headH - .5); ctx.lineTo(w, headH - .5); ctx.stroke();
   for (let c = 0; c < nCh; c++) {
     const x = rowNumW + c * chW + 6;
-    // VU with decay
     const level = vu[c] ? Math.min(1, (vu[c].left + vu[c].right) / 1.6) : 0;
     vuDisp[c] = Math.max(level, (vuDisp[c] || 0) * 0.88);
     ctx.fillStyle = 'rgba(255,255,255,.07)';
@@ -263,8 +314,7 @@ function drawPattern() {
     ctx.shadowColor = chColor(c, 60, .9); ctx.shadowBlur = vuDisp[c] * 10;
     ctx.fillRect(x, headH - 10, (chW - 14) * vuDisp[c], 5);
     ctx.shadowBlur = 0;
-    // name
-    ctx.fillStyle = chColor(c, 72);
+    ctx.fillStyle = editMode && c === cursor.ch ? '#e0a458' : chColor(c, 72);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     ctx.font = `bold 11px ui-monospace, Menlo, monospace`;
     ctx.fillText((song.channels[c] || `ch ${c}`).slice(0, Math.floor(chW / 7)), x, headH - 16);
@@ -282,7 +332,6 @@ function drawScope() {
   grad.addColorStop(0, '#4fc1ff'); grad.addColorStop(0.5, '#7ee787'); grad.addColorStop(1, '#e0a458');
   ctx.strokeStyle = grad;
   ctx.lineWidth = 1.6;
-  ctx.shadowColor = 'rgba(79,193,255,.5)'; ctx.shadowBlur = 8;
   ctx.beginPath();
   const step = scopeData.length / w;
   for (let x = 0; x < w; x++) {
@@ -291,47 +340,336 @@ function drawScope() {
     x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   }
   ctx.stroke();
-  ctx.shadowBlur = 0;
 }
-
 (function loop() { drawPattern(); drawScope(); requestAnimationFrame(loop); })();
 
-// --- loading & transport ---
+// ---------- sample resolution & compile (browser mirror of tools/json2it.js) ----------
+async function resolveSample(def) {
+  const key = JSON.stringify(def);
+  if (sampleCache.has(key)) return sampleCache.get(key);
+  let s;
+  if (def.synth) {
+    s = { name: def.name, ...synthesize(def.synth) };
+  } else if (def.file) {
+    const resp = await fetch('/' + def.file);
+    if (!resp.ok) throw new Error(`fetch failed: ${def.file}`);
+    const wav = readWav(new Uint8Array(await resp.arrayBuffer()));
+    s = { name: def.name || def.file.split('/').pop(), ...wav };
+    if (def.loop === 'cycle') {
+      const n = wav.channels[0].length;
+      s.loop = { start: 0, end: n };
+      s.c5speed = Math.round(n * MIDDLE_C);
+    } else if (def.loop) s.loop = def.loop;
+  } else {
+    s = { ...def };
+  }
+  for (const k of ['volume', 'c5speed', 'susloop']) if (def[k] !== undefined && !def.synth) s[k] = def[k];
+  if (def.detune) s.c5speed = Math.round((s.c5speed || s.samplerate) * Math.pow(2, def.detune / 1200));
+  sampleCache.set(key, s);
+  return s;
+}
+async function compileIt() {
+  const j = edit.json;
+  const samples = await Promise.all((j.samples || []).map(resolveSample));
+  return itwriter({ ...j, samples });
+}
+
+// ---------- edit display sync (local cell formatting, libopenmpt-style) ----------
+const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+function cellString(ev) {
+  if (!ev) return '';
+  let note = '...';
+  if (ev.note === '==') note = '===';
+  else if (ev.note === '^^') note = '^^^';
+  else if (ev.note) note = ev.note;
+  const inst = ev.instrument !== undefined ? String(ev.instrument + 1).padStart(2, '0') : '..';
+  let vol = ' ..';
+  if (ev.vol) {
+    const v = parseInt(ev.vol.slice(1));
+    vol = ev.vol[0] + v.toString(16).toUpperCase().padStart(2, '0');
+  }
+  const fx = ev.fx ? ev.fx.toUpperCase() : '...';
+  return `${note} ${inst}${vol} ${fx}`;
+}
+function syncCell(patIdx, row, ch) {
+  const jpat = edit.json.patterns[patIdx];
+  const ev = jpat.channels[ch]?.[row];
+  if (song?.patterns?.[patIdx]) {
+    song.patterns[patIdx].rows[row][ch] = cellString(ev);
+    invalidatePattern(patIdx);
+  }
+}
+
+// ---------- edit operations ----------
+function jsonPattern() { return edit.json.patterns[viewPattern()]; }
+function ensureChannel(pat, ch) {
+  while (pat.channels.length <= ch) pat.channels.push({});
+  return pat.channels[ch];
+}
+function setNote(noteName) {
+  const pat = jsonPattern();
+  const chn = ensureChannel(pat, cursor.ch);
+  const old = chn[cursor.row] || {};
+  chn[cursor.row] = noteName === '==' ? { note: '==' }
+    : { ...old, note: noteName, instrument: curInst, vol: old.vol || 'v48' };
+  edit.dirty = true;
+  syncCell(viewPattern(), cursor.row, cursor.ch);
+  cursor.row = Math.min((pat.rows || 64) - 1, cursor.row + 1);
+  updateEditState();
+}
+function delNote() {
+  const pat = jsonPattern();
+  const chn = ensureChannel(pat, cursor.ch);
+  if (chn[cursor.row]) { delete chn[cursor.row]; edit.dirty = true; syncCell(viewPattern(), cursor.row, cursor.ch); }
+  updateEditState();
+}
+
+// keyboard piano: two.5 octaves, FT2/IT layout
+const PIANO = {
+  z: 0, s: 1, x: 2, d: 3, c: 4, v: 5, g: 6, b: 7, h: 8, n: 9, j: 10, m: 11, ',': 12,
+  q: 12, 2: 13, w: 14, 3: 15, e: 16, r: 17, 5: 18, t: 19, 6: 20, y: 21, 7: 22, u: 23,
+  i: 24, 9: 25, o: 26, 0: 27, p: 28,
+};
+const noteName = (semi) => NOTE_NAMES[semi % 12].replace('-', semi % 12 === 1 || [1,3,6,8,10].includes(semi % 12) ? '#' : '-') + Math.floor(semi / 12);
+
+function updateEditState() {
+  $('editState').textContent = editMode
+    ? `EDIT · oct ${octave} · inst ${String(curInst + 1).padStart(2, '0')} ${edit?.json.samples[curInst]?.name || ''}${edit?.dirty ? ' · unsaved' : ''}`
+    : '';
+  $('edit').classList.toggle('on', editMode);
+  $('instBar').classList.toggle('show', editMode);
+  markOrder(cur.order);
+}
+
+// ---------- instruments ----------
+function refreshInstruments() {
+  const sel = $('instSel');
+  sel.innerHTML = '';
+  (edit?.json.samples || []).forEach((s, i) => {
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = `${String(i + 1).padStart(2, '0')} ${s.name || s.file?.split('/').pop() || 'sample'}`;
+    sel.appendChild(o);
+  });
+  sel.value = curInst;
+}
+async function addInstrumentDef(def) {
+  try {
+    await resolveSample(def); // validate now (fetch/parse)
+    edit.json.samples.push(def);
+    curInst = edit.json.samples.length - 1;
+    edit.dirty = true;
+    refreshInstruments();
+    updateEditState();
+  } catch (e) {
+    $('meta').textContent = 'instrument error: ' + e.message;
+  }
+}
+function removeInstrument(idx) {
+  edit.json.samples.splice(idx, 1);
+  for (const pat of edit.json.patterns) {
+    pat.channels.forEach((chn, chIdx) => {
+      for (const row of Object.keys(chn)) {
+        const ev = chn[row];
+        if (ev.instrument === undefined) continue;
+        if (ev.instrument === idx) delete chn[row];
+        else if (ev.instrument > idx) ev.instrument--;
+        syncCell(edit.json.patterns.indexOf(pat), +row, chIdx);
+      }
+    });
+  }
+  curInst = Math.max(0, Math.min(curInst, edit.json.samples.length - 1));
+  edit.dirty = true;
+  refreshInstruments();
+  updateEditState();
+}
+
+$('instSel').onchange = (e) => { curInst = +e.target.value; updateEditState(); };
+$('instAdd').onclick = () => {
+  const p = $('instPath').value.trim();
+  if (!p) return;
+  addInstrumentDef($('instLoop').checked ? { name: p.split('/').pop(), file: p, loop: 'cycle', volume: 32 } : { name: p.split('/').pop(), file: p, volume: 48 });
+  $('instPath').value = '';
+};
+$('instFile').onchange = async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const wav = readWav(new Uint8Array(await f.arrayBuffer()));
+  const def = { name: f.name.replace(/\.wav$/i, ''), samplerate: wav.samplerate, channels: wav.channels, volume: $('instLoop').checked ? 32 : 48 };
+  if ($('instLoop').checked) {
+    const n = wav.channels[0].length;
+    def.loop = { start: 0, end: n };
+    def.c5speed = Math.round(n * MIDDLE_C);
+  }
+  addInstrumentDef(def);
+  e.target.value = '';
+};
+$('instDel').onclick = () => { if (edit && edit.json.samples.length > 1) removeInstrument(curInst); };
+$('dlJson').onclick = () => {
+  if (!edit) return;
+  const name = (edit.url?.split('/').pop() || 'song.json');
+  download(new Blob([JSON.stringify(edit.json, null, 1)], { type: 'application/json' }), name);
+};
+$('dlIt').onclick = async () => {
+  if (!edit) return;
+  download(new Blob([await compileIt()]), (edit.json.title || 'song').replace(/\W+/g, '_') + '.it');
+};
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ---------- loading ----------
 async function ensurePlayer() {
   if (!player) initPlayer();
   if (player.context.state === 'suspended') await player.context.resume();
   while (!ready) await new Promise((r) => setTimeout(r, 30));
 }
-async function loadUrl(url) { await ensurePlayer(); player.load(url); started = true; }
-async function loadBuffer(buf) { await ensurePlayer(); player.play(buf); started = true; }
-
+async function loadJsonSong(json, url) {
+  edit = { json, url, dirty: false };
+  cursor = { row: 0, ch: 0 };
+  selOrder = 0;
+  curInst = 0;
+  await ensurePlayer();
+  player.play(await compileIt());
+  edit.dirty = false;
+  started = true; paused = false;
+  refreshInstruments();
+  updateEditState();
+}
+async function loadUrl(url) {
+  if (url.endsWith('.json')) {
+    const j = await (await fetch(url)).json();
+    return loadJsonSong(j, url);
+  }
+  edit = null; editMode = false;
+  await ensurePlayer();
+  player.load(url);
+  started = true; paused = false;
+  updateEditState();
+}
+async function loadBuffer(buf, name = '') {
+  if (name.endsWith('.json')) return loadJsonSong(JSON.parse(new TextDecoder().decode(buf)), name);
+  edit = null; editMode = false;
+  await ensurePlayer();
+  player.play(buf);
+  started = true; paused = false;
+  updateEditState();
+}
 $('loadUrl').onclick = () => loadUrl($('url').value);
-$('file').onchange = async (e) => { const f = e.target.files[0]; if (f) loadBuffer(await f.arrayBuffer()); };
-
+$('file').onchange = async (e) => { const f = e.target.files[0]; if (f) loadBuffer(await f.arrayBuffer(), f.name); };
 const drop = $('drop');
 addEventListener('dragover', (e) => { e.preventDefault(); drop.style.display = 'flex'; });
 addEventListener('dragleave', (e) => { if (!e.relatedTarget) drop.style.display = 'none'; });
 addEventListener('drop', async (e) => {
   e.preventDefault(); drop.style.display = 'none';
   const f = e.dataTransfer.files[0];
-  if (f) loadBuffer(await f.arrayBuffer());
+  if (f) loadBuffer(await f.arrayBuffer(), f.name);
 });
 
-$('play').onclick = async () => { if (!started) return loadUrl($('url').value); player.togglePause(); };
+// ---------- transport ----------
+async function playFromSelection() {
+  // (re)compile if edited, then play the selected order slot from the top
+  if (edit && edit.dirty) {
+    player.play(await compileIt());
+    edit.dirty = false;
+    updateEditState();
+  } else if (!started) {
+    if (edit) player.play(await compileIt());
+    else return loadUrl($('url').value);
+  }
+  started = true; paused = false;
+  player.setOrderRow(selOrder, 0);
+}
+function doPause() { if (started && !paused) { player.pause(); paused = true; } }
+function doResume() { if (started && paused) { player.unpause(); paused = false; } }
+
+$('play').onclick = async () => {
+  if (!started) return editMode && edit ? playFromSelection() : loadUrl($('url').value);
+  if (paused) doResume();
+};
+$('pause').onclick = () => { paused ? doResume() : doPause(); };
 $('stop').onclick = () => {
   if (!player) return;
-  player.stop(); started = false;
+  player.stop(); started = false; paused = false;
   $('pos').textContent = '--:-- · ord -/- · row --';
+  markOrder(0);
+};
+$('edit').onclick = () => {
+  if (!edit) { $('meta').textContent = 'edit mode needs a .json song (e.g. ../songs/first_light.json)'; return; }
+  editMode = !editMode;
+  if (editMode) selOrder = started ? cur.order : selOrder;
+  updateEditState();
 };
 $('seek').oninput = () => { seeking = true; };
 $('seek').onchange = () => { if (player) player.setPos(parseFloat($('seek').value)); seeking = false; };
 $('vol').oninput = () => player && player.setVol(parseFloat($('vol').value));
 $('tempo').oninput = () => player && player.setTempo(parseFloat($('tempo').value));
 $('pitch').oninput = () => player && player.setPitch(parseFloat($('pitch').value));
-$('reset').onclick = () => {
-  $('tempo').value = 1; $('pitch').value = 1;
-  if (player) { player.setTempo(1); player.setPitch(1); }
-};
+
+// click grid to place cursor
+patC.addEventListener('mousedown', (e) => {
+  if (!editMode || !song) return;
+  const r = patC.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const { rowH, headH, rowNumW } = LAYOUT;
+  const nCh = (song.channels || []).length;
+  const chW = Math.max(112, (r.width - rowNumW - 8) / nCh);
+  if (y < headH) return;
+  const centerY = headH + (r.height - headH) / 2;
+  const row = Math.round(dispRow + (y - centerY) / rowH);
+  const ch = Math.floor((x - rowNumW) / chW);
+  const pat = song.patterns[viewPattern()];
+  if (row >= 0 && row < pat.rows.length && ch >= 0 && ch < nCh) cursor = { row, ch };
+});
+
+// ---------- keyboard ----------
+addEventListener('keydown', async (e) => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+    if (e.key === 'Escape') e.target.blur();
+    return;
+  }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (!started) { editMode && edit ? await playFromSelection() : (edit ? await playFromSelection() : $('url').value && loadUrl($('url').value)); return; }
+    if (paused) { (edit && edit.dirty) ? await playFromSelection() : doResume(); }
+    else if (edit && edit.dirty && editMode) { await playFromSelection(); }
+    else { doPause(); }
+    return;
+  }
+  if (!editMode || !song) return;
+
+  const pat = song.patterns[viewPattern()];
+  const nCh = (song.channels || []).length;
+  switch (e.key) {
+    case 'ArrowUp': e.preventDefault(); cursor.row = (cursor.row - 1 + pat.rows.length) % pat.rows.length; return;
+    case 'ArrowDown': e.preventDefault(); cursor.row = (cursor.row + 1) % pat.rows.length; return;
+    case 'ArrowLeft': e.preventDefault(); cursor.ch = (cursor.ch - 1 + nCh) % nCh; return;
+    case 'ArrowRight': e.preventDefault(); cursor.ch = (cursor.ch + 1) % nCh; return;
+    case 'PageUp': e.preventDefault(); cursor.row = Math.max(0, cursor.row - 16); return;
+    case 'PageDown': e.preventDefault(); cursor.row = Math.min(pat.rows.length - 1, cursor.row + 16); return;
+    case 'Home': e.preventDefault(); cursor.row = 0; return;
+    case 'End': e.preventDefault(); cursor.row = pat.rows.length - 1; return;
+    case 'Delete': case 'Backspace': e.preventDefault(); delNote(); return;
+    case '[': octave = Math.max(1, octave - 1); updateEditState(); return;
+    case ']': octave = Math.min(8, octave + 1); updateEditState(); return;
+    case 'a': setNote('=='); return;
+  }
+  const k = e.key.toLowerCase();
+  if (k in PIANO) {
+    e.preventDefault();
+    const semi = octave * 12 + PIANO[k];
+    if (semi < 120) setNote(NOTE_NAMES[semi % 12].length === 2 && NOTE_NAMES[semi % 12][1] === '#'
+      ? NOTE_NAMES[semi % 12] + Math.floor(semi / 12)
+      : NOTE_NAMES[semi % 12] + Math.floor(semi / 12));
+  }
+});
 </script>
 </body>
 </html>

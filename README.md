@@ -34,8 +34,14 @@ Human editing: `brew install --cask schism-tracker`, then open `build/*.it`.
   corpus-derived composition guidelines, licensing rules
 - `vendor/itwriter/` — vendored [itwriter](https://github.com/chr15m/itwriter) (MIT),
   patched: sample loop points, default volume, C5Speed override
-- `player/` — browser player; `player/vendor/chiptune3/` is vendored
-  [chiptune3](https://github.com/DrSnuggles/chiptune) (MIT/BSD), patched: per-channel VU enabled
+- `player/` — browser tracker: pattern view with playhead, VU meters, oscilloscope,
+  and an **edit mode** for `.json` songs (piano-roll keyboard, instrument add/remove,
+  in-browser itwriter compile, ⬇ json/.it export). Space = pause/resume; in edit
+  mode space (re)plays the selected pattern. Keys: z s x d c v g b h n j m = C..B,
+  q 2 w 3 e … = octave up, i 9 o 0 p = two up, a = note off, Delete = remove,
+  arrows/PgUp/PgDn = cursor, [ ] = octave, click = place cursor.
+  `player/vendor/chiptune3/` is vendored [chiptune3](https://github.com/DrSnuggles/chiptune)
+  (MIT/BSD), patched: per-channel VU + formatted pattern data
 - `library/` — samples/modules/corpus (not in git; see library/README.md for rules)
 - `build/` — generated `.it` files (not in git)
 
