@@ -48,8 +48,10 @@ itwriter structure (full reference: `vendor/itwriter/UPSTREAM-README.md` + `exam
 }
 ```
 
-- Notes: `C-5`..`B-9`, sharps as `C#5`. **C-5 plays samples at their C5Speed**;
-  our single-cycle convention tunes C-5 = middle C (261.6 Hz).
+- Notes: `C-5`..`B-9`, sharps as `C#5` — ALWAYS 3 chars, never `C#-5`/`F#-4`
+  (itwriter parses `note[2]` as the octave; a dash there silently becomes C-0).
+  **C-5 plays samples at their C5Speed**; our single-cycle convention tunes
+  C-5 = middle C (261.6 Hz).
 - `instrument` is **0-based** in JSON (itwriter converts to 1-based IT).
 - `vol` column: `v00`-`v64` volume, `p00`-`p64` pan; also `a/b/c/d` vol-slides, `g` tone-porta.
 - `fx`: IT effect string, letter+2 hex digits. Common IT effects:
@@ -64,9 +66,11 @@ itwriter structure (full reference: `vendor/itwriter/UPSTREAM-README.md` + `exam
   // waves: sine|square|saw|triangle (single-cycle, auto-looped, C-5 = middle C)
   //        noise (seconds, decay) | kick (seconds, freqStart, freqEnd) — one-shots
 { "name": "flute", "file": "library/samples/akwf/AKWF/AKWF_flute/AKWF_flute_0011.wav",
-  "loop": "cycle", "volume": 34 },
+  "loop": "cycle", "volume": 34, "detune": -4 },
   // loop:"cycle" = loop whole file as single-cycle waveform, auto-tuned
   // loop:{start,end} for sampled instruments with loop regions; omit for one-shots
+  // detune (cents): load the same file twice at ±4 and play both on two
+  // channels panned L/R for a fat chorus lead
 { "name": "raw", "samplerate": 44100, "channels": [[/* floats -1..1 */]] }
 ```
 
@@ -118,6 +122,18 @@ Idioms that make it sound like tracker music (all seen in corpus):
 
 Effect frequency in corpus (XM letters → IT equivalent): arpeggio 0→`J` (by far #1),
 vibrato 4→`H`, tone porta 3→`G`, set vol C→vol column, vol slide A→`D`, porta 1/2→`F/E`.
+
+## Composing full tracks: use a generator script
+
+Hand-writing 64-row × 10-channel patterns as JSON does not scale. Write a
+small Node script (`songs/<name>.gen.js`, see `songs/first_light.gen.js`)
+that emits the song JSON: hand-author melodies as `[row, note, vol, fx]`
+lists; build drums/bass/arps/pads with helper functions; derive echo and
+harmony channels by transforming the melody (delay + volume scale +
+transpose). Keep note-name helpers that handle sharps correctly. More
+arrangement tricks that worked: whole-step key change for the final
+sections (with a build pattern on the new key's dominant), dual detuned
+leads, pad + pad-a-fifth-up panned apart.
 
 ## Licensing rules
 
