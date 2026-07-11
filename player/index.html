@@ -3,187 +3,331 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mod_music player</title>
+<title>mod_music tracker</title>
 <style>
   :root {
-    --bg: #14161c; --panel: #1d2026; --text: #d7dae0; --dim: #7d8590;
-    --accent: #4fc1ff; --vu: #3fb950; --vu-hot: #d29922;
+    --bg: #0d0f14; --panel: #151821; --panel2: #1b1f2b; --text: #d7dae0; --dim: #6b7280;
+    --accent: #4fc1ff; --playhead: #ffffff;
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; padding: 2rem; background: var(--bg); color: var(--text);
-    font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    margin: 0; padding: 1rem 1.25rem; background: var(--bg); color: var(--text);
+    font: 13px/1.45 ui-monospace, "SF Mono", Menlo, monospace;
+    display: flex; flex-direction: column; gap: .6rem; height: 100vh;
   }
-  h1 { font-size: 1.1rem; letter-spacing: .08em; color: var(--accent); }
-  .panel { background: var(--panel); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
-  .row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin: .5rem 0; }
+  h1 { font-size: .95rem; letter-spacing: .12em; color: var(--accent); margin: 0; }
+  h1 small { color: var(--dim); letter-spacing: 0; }
+  .panel { background: var(--panel); border-radius: 8px; padding: .5rem .75rem; }
+  .row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
   button {
-    background: #2a2e37; color: var(--text); border: 1px solid #3a3f4b;
-    border-radius: 6px; padding: .4rem .9rem; font: inherit; cursor: pointer;
+    background: #232838; color: var(--text); border: 1px solid #333a4d;
+    border-radius: 6px; padding: .3rem .8rem; font: inherit; cursor: pointer;
   }
   button:hover { border-color: var(--accent); }
   input[type=text] {
-    background: #0f1116; color: var(--text); border: 1px solid #3a3f4b;
-    border-radius: 6px; padding: .4rem .6rem; font: inherit; flex: 1; min-width: 200px;
+    background: #0a0c10; color: var(--text); border: 1px solid #333a4d;
+    border-radius: 6px; padding: .3rem .5rem; font: inherit; flex: 1; min-width: 160px;
   }
   input[type=range] { accent-color: var(--accent); }
-  label { color: var(--dim); }
-  #meta { white-space: pre-wrap; color: var(--dim); }
-  #pos { color: var(--accent); }
-  #vu { display: flex; gap: 6px; align-items: flex-end; height: 96px; }
-  .vubar { width: 22px; background: #0f1116; border-radius: 3px; position: relative; height: 100%; }
-  .vufill { position: absolute; bottom: 0; width: 100%; border-radius: 3px; background: var(--vu); }
-  .chname { text-align: center; color: var(--dim); font-size: 10px; margin-top: 4px; max-width: 22px; overflow: hidden; }
-  #drop { border: 2px dashed #3a3f4b; border-radius: 8px; padding: 1rem; text-align: center; color: var(--dim); }
-  #drop.over { border-color: var(--accent); color: var(--accent); }
+  label { color: var(--dim); font-size: 11px; }
+  #pos { color: var(--accent); min-width: 15ch; }
+  #title { color: var(--text); }
+  /* order strip */
+  #order { display: flex; gap: 3px; flex-wrap: wrap; }
+  .ord {
+    min-width: 26px; text-align: center; padding: 2px 4px; border-radius: 4px;
+    background: var(--panel2); color: var(--dim); font-size: 11px; cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .ord.cur { color: #fff; border-color: var(--accent); background: #1e3a52; }
+  /* canvases */
+  #scope { width: 100%; height: 56px; display: block; border-radius: 8px; background: var(--panel); }
+  #patwrap { flex: 1; min-height: 0; position: relative; }
+  #pat { width: 100%; height: 100%; display: block; border-radius: 8px; background: var(--panel); }
+  #drop { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(13,15,20,.85); border: 2px dashed var(--accent); border-radius: 8px;
+    color: var(--accent); font-size: 1.1rem; pointer-events: none; }
+  #meta { color: var(--dim); font-size: 11px; white-space: pre-wrap; max-height: 60px; overflow-y: auto; }
 </style>
 </head>
 <body>
-<h1>MOD_MUSIC · player</h1>
-
-<div class="panel">
-  <div class="row">
-    <input type="text" id="url" value="../build/demo.it">
-    <button id="loadUrl">Load URL</button>
-    <input type="file" id="file" accept=".it,.xm,.mod,.s3m,.mptm,.med,.umx">
-  </div>
-  <div id="drop">…or drop a module file here</div>
+<div class="row" style="justify-content: space-between">
+  <h1>MOD_MUSIC <small>· tracker</small> <span id="title"></span></h1>
+  <span id="pos">--:-- · ord -/- · row --</span>
 </div>
 
-<div class="panel">
-  <div class="row">
-    <button id="play">▶ Play/Pause</button>
-    <button id="stop">■ Stop</button>
-    <span id="pos">--:-- · ord -/- · row --</span>
-  </div>
-  <div class="row">
-    <label>seek</label><input type="range" id="seek" min="0" max="100" step="0.1" value="0" style="flex:1">
-  </div>
-  <div class="row">
-    <label>vol</label><input type="range" id="vol" min="0" max="1.5" step="0.01" value="1">
-    <label>tempo</label><input type="range" id="tempo" min="0.5" max="2" step="0.05" value="1">
-    <label>pitch</label><input type="range" id="pitch" min="0.5" max="2" step="0.05" value="1">
-    <button id="reset">reset</button>
-  </div>
+<div class="panel row">
+  <button id="play">▶</button>
+  <button id="stop">■</button>
+  <input type="range" id="seek" min="0" max="100" step="0.1" value="0" style="flex:2; min-width:120px">
+  <label>vol</label><input type="range" id="vol" min="0" max="1.5" step="0.01" value="1" style="width:70px">
+  <label>tempo</label><input type="range" id="tempo" min="0.5" max="2" step="0.05" value="1" style="width:70px">
+  <label>pitch</label><input type="range" id="pitch" min="0.5" max="2" step="0.05" value="1" style="width:70px">
+  <button id="reset" style="font-size:11px">reset</button>
+  <input type="text" id="url" value="../build/first_light.it">
+  <button id="loadUrl">Load</button>
+  <input type="file" id="file" accept=".it,.xm,.mod,.s3m,.mptm,.med,.umx" style="font-size:11px">
 </div>
 
-<div class="panel">
-  <div id="vu"></div>
-  <div id="channames" style="display:flex; gap:6px;"></div>
+<div class="panel" id="orderPanel"><div id="order"></div></div>
+<canvas id="scope"></canvas>
+<div id="patwrap">
+  <canvas id="pat"></canvas>
+  <div id="drop">drop a module</div>
 </div>
-
-<div class="panel"><div id="meta">no module loaded</div></div>
+<div class="panel" id="meta">no module loaded — Load a URL or drop a .it/.xm/.mod file</div>
 
 <script type="module">
 import { ChiptuneJsPlayer } from './vendor/chiptune3/chiptune3.js';
 
 const $ = (id) => document.getElementById(id);
-let player = null;
-let ready = false;
-let seeking = false;
-let started = false; // AudioContext needs a user gesture
+let player = null, ready = false, started = false, seeking = false;
+let song = null;          // meta.song: channels, patterns (formatted cells), orders
+let orders = [];          // pattern index per order pos
+let cur = { order: 0, pattern: 0, row: 0, pos: 0 };
+let dispRow = 0;          // smoothed row for scrolling
+let vu = [];              // latest per-channel {left,right}
+let vuDisp = [];          // decaying display values
+let analyser = null, scopeData = null;
+
+// channel hues — stable, readable on dark
+const hue = (i) => (i * 47 + 190) % 360;
+const chColor = (i, l = 65, a = 1) => `hsla(${hue(i)}, 75%, ${l}%, ${a})`;
 
 function initPlayer() {
   player = new ChiptuneJsPlayer({ repeatCount: -1 });
-  player.onInitialized(() => { ready = true; });
+  player.onInitialized(() => {
+    ready = true;
+    analyser = player.context.createAnalyser();
+    analyser.fftSize = 2048;
+    scopeData = new Float32Array(analyser.fftSize);
+    player.gain.connect(analyser);
+  });
   player.onError((e) => { $('meta').textContent = 'error: ' + JSON.stringify(e); });
 
   player.onMetadata((meta) => {
-    const song = meta.song || {};
-    const lines = [
-      `title:    ${meta.title || '(untitled)'}`,
-      `tracker:  ${meta.tracker || '?'}   format: ${meta.type_long || meta.type || '?'}`,
-      `duration: ${fmt(meta.dur)}   channels: ${(song.channels || []).length}`,
-      `orders:   ${meta.totalOrders}   patterns: ${meta.totalPatterns}   samples: ${(song.samples || []).filter(Boolean).length}`,
-      meta.message ? `\n${meta.message}` : '',
-      `\nlibopenmpt ${meta.libopenmptVersion || ''}`,
-    ];
-    $('meta').textContent = lines.join('\n');
+    song = meta.song || {};
+    orders = (song.orders || []).map((o) => o.pat);
+    $('title').textContent = '· ' + (meta.title || '(untitled)');
     $('seek').max = meta.dur || 100;
-    buildVu(song.channels || []);
+    $('meta').textContent =
+      `${meta.tracker || '?'} · ${(song.channels || []).length}ch · ${meta.totalPatterns} patterns · ${meta.totalOrders} orders · ${fmt(meta.dur)}` +
+      (meta.message ? `\n${meta.message.replace(/\n+/g, ' — ')}` : '');
+    vuDisp = new Array((song.channels || []).length).fill(0);
+    patCache.clear();
+    buildOrderStrip();
   });
 
   player.onProgress((d) => {
-    if (!started) return; // ignore in-flight messages after stop
-    $('pos').textContent = `${fmt(d.pos)} · ord ${d.order}/${(player.meta?.totalOrders ?? 0) - 1} · row ${String(d.row).padStart(2, '0')}`;
+    if (!started) return;
+    cur = d;
+    vu = d.vu || [];
+    $('pos').textContent = `${fmt(d.pos)} · ord ${d.order}/${orders.length - 1} · row ${String(d.row).padStart(2, '0')}`;
     if (!seeking) $('seek').value = d.pos;
-    if (d.vu) updateVu(d.vu);
+    markOrder(d.order);
   });
 }
 
-function fmt(s) {
-  if (s === undefined || isNaN(s)) return '--:--';
-  s = Math.max(0, s);
-  return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-}
+const fmt = (s) => (s === undefined || isNaN(s)) ? '--:--' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-// --- VU meters ---
-let fills = [];
-function buildVu(channels) {
-  const vu = $('vu'); vu.innerHTML = '';
-  const names = $('channames'); names.innerHTML = '';
-  fills = channels.map((name, i) => {
-    const bar = document.createElement('div'); bar.className = 'vubar';
-    const fill = document.createElement('div'); fill.className = 'vufill';
-    bar.appendChild(fill); vu.appendChild(bar);
-    const n = document.createElement('div'); n.className = 'chname';
-    n.textContent = name || i; names.appendChild(n);
-    return fill;
+// --- order strip ---
+function buildOrderStrip() {
+  const el = $('order');
+  el.innerHTML = '';
+  orders.forEach((pat, i) => {
+    const d = document.createElement('div');
+    d.className = 'ord';
+    d.textContent = pat;
+    d.title = `order ${i} → pattern ${pat}`;
+    d.onclick = () => { if (player && started) player.setOrderRow(i, 0); };
+    el.appendChild(d);
   });
 }
-function updateVu(vu) {
-  for (let i = 0; i < fills.length && i < vu.length; i++) {
-    const v = Math.min(1, (vu[i].left + vu[i].right) / 2);
-    fills[i].style.height = `${Math.round(v * 100)}%`;
-    fills[i].style.background = v > 0.8 ? 'var(--vu-hot)' : 'var(--vu)';
+function markOrder(o) {
+  [...$('order').children].forEach((d, i) => d.classList.toggle('cur', i === o));
+}
+
+// --- canvas setup ---
+const patC = $('pat'), scopeC = $('scope');
+function fitCanvas(c) {
+  const r = c.getBoundingClientRect();
+  const dpr = devicePixelRatio || 1;
+  if (c.width !== Math.round(r.width * dpr) || c.height !== Math.round(r.height * dpr)) {
+    c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+  }
+  return { w: r.width, h: r.height, dpr };
+}
+
+// cell format from libopenmpt (width 13): "NNN IIvVV FFP" — slice into segments
+const SEG = [[0, 3], [4, 6], [6, 9], [10, 13]];
+const SEGCOLOR = (i, chIdx) => [chColor(chIdx), '#8b93a7', '#7ec699', '#e0a458'][i];
+
+// patterns are pre-rendered once to offscreen canvases; per-frame work is
+// just blitting at the scroll offset plus playhead/header/VU overlays.
+const patCache = new Map();
+function patternCanvas(patIdx, chW, nCh, rowH, rowNumW, dpr) {
+  const key = `${patIdx}:${Math.round(chW)}:${dpr}`;
+  if (patCache.has(key)) return patCache.get(key);
+  const pat = song.patterns[patIdx];
+  const c = document.createElement('canvas');
+  c.width = Math.round((rowNumW + nCh * chW) * dpr);
+  c.height = Math.round(pat.rows.length * rowH * dpr);
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const font = `${Math.min(13, chW / 9.2)}px ui-monospace, Menlo, monospace`;
+  ctx.font = font;
+  ctx.textBaseline = 'middle';
+  for (let r = 0; r < pat.rows.length; r++) {
+    const y = r * rowH + rowH / 2;
+    if (r % 16 === 0) { ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fillRect(0, r * rowH, rowNumW + nCh * chW, rowH); }
+    else if (r % 4 === 0) { ctx.fillStyle = 'rgba(255,255,255,.02)'; ctx.fillRect(0, r * rowH, rowNumW + nCh * chW, rowH); }
+    ctx.fillStyle = r % 4 === 0 ? '#9aa3b5' : '#525a6b';
+    ctx.textAlign = 'right';
+    ctx.fillText(String(r).padStart(2, '0'), rowNumW - 6, y);
+    ctx.textAlign = 'left';
+    const row = pat.rows[r];
+    for (let ch = 0; ch < nCh; ch++) {
+      const x = rowNumW + ch * chW + 6;
+      const cell = row[ch] || '';
+      const empty = !cell.trim() || /^[.\s]+$/.test(cell);
+      if (empty) { ctx.fillStyle = 'rgba(120,130,150,.18)'; ctx.fillText('···', x, y); continue; }
+      let dx = 0;
+      for (let s = 0; s < SEG.length; s++) {
+        const part = cell.slice(SEG[s][0], SEG[s][1]);
+        if (part.trim() && !/^[.]+$/.test(part.trim())) {
+          ctx.fillStyle = SEGCOLOR(s, ch);
+          ctx.fillText(part, x + dx, y);
+        }
+        dx += ctx.measureText(part + ' ').width;
+      }
+    }
+  }
+  patCache.set(key, c);
+  return c;
+}
+
+function drawPattern() {
+  const { w, h, dpr } = fitCanvas(patC);
+  const ctx = patC.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (!song || !song.patterns || !song.patterns.length) return;
+
+  const patIdx = Math.min(cur.pattern, song.patterns.length - 1);
+  const pat = song.patterns[patIdx];
+  const nCh = (song.channels || []).length;
+  const rowH = 17, headH = 34, rowNumW = 34;
+  const chW = Math.max(112, (w - rowNumW - 8) / nCh);
+
+  // smooth scroll toward current row
+  const target = cur.row;
+  dispRow += (target - dispRow) * 0.35;
+  if (Math.abs(target - dispRow) > 12) dispRow = target;
+
+  const centerY = headH + (h - headH) / 2;
+
+  // blit pre-rendered pattern at scroll offset
+  const img = patternCanvas(patIdx, chW, nCh, rowH, rowNumW, dpr);
+  const srcY = (dispRow * rowH + rowH / 2) * dpr - (centerY - headH) * dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(img,
+    0, srcY, img.width, (h - headH) * dpr,
+    0, headH * dpr, img.width, (h - headH) * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // playhead
+  const phY = centerY;
+  const grad = ctx.createLinearGradient(0, phY - rowH, 0, phY + rowH);
+  grad.addColorStop(0, 'rgba(79,193,255,0)');
+  grad.addColorStop(0.5, 'rgba(79,193,255,.16)');
+  grad.addColorStop(1, 'rgba(79,193,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, phY - rowH, w, rowH * 2);
+  ctx.fillStyle = 'rgba(79,193,255,.9)';
+  ctx.fillRect(0, phY - rowH / 2, 3, rowH);
+  ctx.fillRect(w - 3, phY - rowH / 2, 3, rowH);
+
+  // channel header (drawn last, opaque above scrolling rows)
+  ctx.fillStyle = '#11141c';
+  ctx.fillRect(0, 0, w, headH);
+  ctx.strokeStyle = 'rgba(255,255,255,.08)';
+  ctx.beginPath(); ctx.moveTo(0, headH - .5); ctx.lineTo(w, headH - .5); ctx.stroke();
+  for (let c = 0; c < nCh; c++) {
+    const x = rowNumW + c * chW + 6;
+    // VU with decay
+    const level = vu[c] ? Math.min(1, (vu[c].left + vu[c].right) / 1.6) : 0;
+    vuDisp[c] = Math.max(level, (vuDisp[c] || 0) * 0.88);
+    ctx.fillStyle = 'rgba(255,255,255,.07)';
+    ctx.fillRect(x, headH - 10, chW - 14, 5);
+    ctx.fillStyle = chColor(c, 60, .95);
+    ctx.shadowColor = chColor(c, 60, .9); ctx.shadowBlur = vuDisp[c] * 10;
+    ctx.fillRect(x, headH - 10, (chW - 14) * vuDisp[c], 5);
+    ctx.shadowBlur = 0;
+    // name
+    ctx.fillStyle = chColor(c, 72);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.font = `bold 11px ui-monospace, Menlo, monospace`;
+    ctx.fillText((song.channels[c] || `ch ${c}`).slice(0, Math.floor(chW / 7)), x, headH - 16);
   }
 }
 
-// --- loading ---
+function drawScope() {
+  const { w, h, dpr } = fitCanvas(scopeC);
+  const ctx = scopeC.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (!analyser) return;
+  analyser.getFloatTimeDomainData(scopeData);
+  const grad = ctx.createLinearGradient(0, 0, w, 0);
+  grad.addColorStop(0, '#4fc1ff'); grad.addColorStop(0.5, '#7ee787'); grad.addColorStop(1, '#e0a458');
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 1.6;
+  ctx.shadowColor = 'rgba(79,193,255,.5)'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  const step = scopeData.length / w;
+  for (let x = 0; x < w; x++) {
+    const v = scopeData[Math.floor(x * step)] || 0;
+    const y = h / 2 - v * h * 0.46;
+    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+(function loop() { drawPattern(); drawScope(); requestAnimationFrame(loop); })();
+
+// --- loading & transport ---
 async function ensurePlayer() {
   if (!player) initPlayer();
   if (player.context.state === 'suspended') await player.context.resume();
-  // wait for worklet init
   while (!ready) await new Promise((r) => setTimeout(r, 30));
 }
-
-async function loadUrl(url) {
-  await ensurePlayer();
-  player.load(url);
-  started = true;
-}
-async function loadBuffer(buf) {
-  await ensurePlayer();
-  player.play(buf);
-  started = true;
-}
+async function loadUrl(url) { await ensurePlayer(); player.load(url); started = true; }
+async function loadBuffer(buf) { await ensurePlayer(); player.play(buf); started = true; }
 
 $('loadUrl').onclick = () => loadUrl($('url').value);
-$('file').onchange = async (e) => {
-  const f = e.target.files[0];
-  if (f) loadBuffer(await f.arrayBuffer());
-};
+$('file').onchange = async (e) => { const f = e.target.files[0]; if (f) loadBuffer(await f.arrayBuffer()); };
 
 const drop = $('drop');
-drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
-drop.ondragleave = () => drop.classList.remove('over');
-drop.ondrop = async (e) => {
-  e.preventDefault(); drop.classList.remove('over');
+addEventListener('dragover', (e) => { e.preventDefault(); drop.style.display = 'flex'; });
+addEventListener('dragleave', (e) => { if (!e.relatedTarget) drop.style.display = 'none'; });
+addEventListener('drop', async (e) => {
+  e.preventDefault(); drop.style.display = 'none';
   const f = e.dataTransfer.files[0];
   if (f) loadBuffer(await f.arrayBuffer());
-};
+});
 
-// --- transport ---
-$('play').onclick = async () => {
-  if (!started) return loadUrl($('url').value); // first click: load default
-  player.togglePause();
+$('play').onclick = async () => { if (!started) return loadUrl($('url').value); player.togglePause(); };
+$('stop').onclick = () => {
+  if (!player) return;
+  player.stop(); started = false;
+  $('pos').textContent = '--:-- · ord -/- · row --';
 };
-$('stop').onclick = () => { if (player) { player.stop(); started = false; $('pos').textContent = '--:-- · ord -/- · row --'; } };
 $('seek').oninput = () => { seeking = true; };
 $('seek').onchange = () => { if (player) player.setPos(parseFloat($('seek').value)); seeking = false; };
-$('vol').oninput = () => { if (player) player.setVol(parseFloat($('vol').value)); };
-$('tempo').oninput = () => { if (player) player.setTempo(parseFloat($('tempo').value)); };
-$('pitch').oninput = () => { if (player) player.setPitch(parseFloat($('pitch').value)); };
+$('vol').oninput = () => player && player.setVol(parseFloat($('vol').value));
+$('tempo').oninput = () => player && player.setTempo(parseFloat($('tempo').value));
+$('pitch').oninput = () => player && player.setPitch(parseFloat($('pitch').value));
 $('reset').onclick = () => {
   $('tempo').value = 1; $('pitch').value = 1;
   if (player) { player.setTempo(1); player.setPitch(1); }

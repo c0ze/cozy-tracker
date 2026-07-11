@@ -280,7 +280,7 @@ class MPT extends AudioWorkletProcessor {
 				pat: libopenmpt._openmpt_module_get_order_pattern(this.modulePtr, i),
 			})
 		}
-		// patterns
+		// patterns — cells as formatted tracker strings "C-5 01 v40 J37" (13 wide)
 		for (let patIdx = 0, patNum = libopenmpt._openmpt_module_get_num_patterns(this.modulePtr); patIdx < patNum; patIdx++) {
 			const pattern = {
 				name: libopenmpt.UTF8ToString(libopenmpt._openmpt_module_get_pattern_name(this.modulePtr, patIdx)),
@@ -291,19 +291,9 @@ class MPT extends AudioWorkletProcessor {
 				const row = []
 				// channels
 				for (let chIdx = 0; chIdx < chNum; chIdx++) {
-					const channel = []
-					for (let comIdx = 0; comIdx < 6; comIdx++) {
-						/* commands
-						OPENMPT_MODULE_COMMAND_NOTE = 0
-						OPENMPT_MODULE_COMMAND_INSTRUMENT = 1
-						OPENMPT_MODULE_COMMAND_VOLUMEEFFECT = 2
-						OPENMPT_MODULE_COMMAND_EFFECT = 3
-						OPENMPT_MODULE_COMMAND_VOLUME = 4
-						OPENMPT_MODULE_COMMAND_PARAMETER = 5
-						*/
-						channel.push( libopenmpt._openmpt_module_get_pattern_row_channel_command(this.modulePtr, patIdx, rowIdx, chIdx, comIdx) )
-					}
-					row.push( channel )
+					const ptr = libopenmpt._openmpt_module_format_pattern_row_channel(this.modulePtr, patIdx, rowIdx, chIdx, 13, 1)
+					row.push( libopenmpt.UTF8ToString(ptr) )
+					libopenmpt._openmpt_free_string(ptr)
 				}
 				pattern.rows.push( row )
 			}
