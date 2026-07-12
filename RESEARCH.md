@@ -1,5 +1,9 @@
 # cozy-tracker — Stack Research & Decisions (July 2026)
 
+> Historical decision record from the project's first day. For what exists
+> now, see the [README](README.md) and the live site at
+> [tracker.coze.org](https://tracker.coze.org).
+
 Research into the player / tracker / API combo for AI-assisted tracker music, plus
 license-safe module & sample sources. Three parallel research passes: playback
 libraries, trackers + programmatic write APIs, and content licensing.

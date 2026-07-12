@@ -1,5 +1,8 @@
 # cozy-tracker — adaptive game music, generated
 
+**Live: [tracker.coze.org](https://tracker.coze.org)** — hear the tracks and
+drive the adaptive demos in your browser.
+
 ## Why it exists
 
 Game music forces a bad trade. Either you license a flat loop that plays the
