@@ -781,6 +781,15 @@ addEventListener('keydown', async (e) => {
       : NOTE_NAMES[semi % 12] + Math.floor(semi / 12));
   }
 });
+
+// deep-link: /player/?song=../demos/night_bus.it loads (and, after a user
+// gesture unlocks audio, plays) that module. Used by the landing page.
+(() => {
+  const q = new URLSearchParams(location.search).get('song');
+  if (!q) return;
+  $('url').value = q;
+  loadUrl(q).catch(() => {});
+})();
 </script>
 </body>
 </html>

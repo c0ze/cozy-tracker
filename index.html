@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cozy-tracker — adaptive game music, generated</title>
+<meta name="description" content="Describe the mood — get an adaptive score that reacts to your game, in 30 kilobytes, cleared to ship.">
+<link rel="icon" href="assets/logo.png">
+<meta property="og:title" content="cozy-tracker">
+<meta property="og:description" content="Adaptive game music, generated. Describe the mood — get a score that reacts to your game.">
+<meta property="og:image" content="assets/banner.png">
+<style>
+  :root {
+    --bg:#0b0d12; --panel:#14171f; --panel2:#1b1f2b; --line:#2a3040;
+    --text:#e6e9ef; --dim:#8b93a7;
+    --cyan:#4fc1ff; --magenta:#ff5ac0; --gold:#e0a458; --green:#7ee787; --purple:#a071ff;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--bg); color:var(--text);
+    font:16px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  code, pre, .mono { font-family:ui-monospace,"SF Mono",Menlo,monospace; }
+  a { color:var(--cyan); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .wrap { max-width:960px; margin:0 auto; padding:0 1.25rem; }
+  .btn {
+    display:inline-block; padding:.6rem 1.15rem; border-radius:8px; font-weight:600;
+    border:1px solid var(--line); color:var(--text); background:var(--panel2); cursor:pointer;
+  }
+  .btn:hover { border-color:var(--cyan); text-decoration:none; }
+  .btn.primary {
+    background:linear-gradient(90deg,var(--magenta),var(--gold)); color:#12060f; border:none;
+  }
+
+  /* hero */
+  header { position:relative; overflow:hidden; border-bottom:1px solid var(--line); }
+  header::after { /* scanlines */
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
+    mix-blend-mode:multiply;
+  }
+  .hero-img { width:100%; display:block; }
+  .hero-copy { text-align:center; padding:2.2rem 1.25rem 2.6rem; }
+  .hero-copy h1 { font-size:1.05rem; letter-spacing:.34em; color:var(--cyan); margin:0 0 1rem; text-transform:uppercase; }
+  .tagline { font-size:clamp(1.4rem,4vw,2.1rem); font-weight:700; line-height:1.25; margin:0 auto; max-width:20ch; }
+  .tagline b { background:linear-gradient(90deg,var(--cyan),var(--green),var(--gold)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub { color:var(--dim); margin:1rem auto 1.6rem; max-width:52ch; }
+  .cta { display:flex; gap:.7rem; justify-content:center; flex-wrap:wrap; }
+
+  section { padding:3rem 0; border-bottom:1px solid var(--line); }
+  h2 { font-size:1.5rem; margin:0 0 .4rem; }
+  h2 .k { color:var(--magenta); font:600 .8rem/1 ui-monospace,monospace; letter-spacing:.2em; display:block; margin-bottom:.5rem; text-transform:uppercase; }
+  .lead { color:var(--dim); max-width:64ch; margin:0 0 1.6rem; }
+
+  .grid { display:grid; gap:1rem; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:1.1rem 1.2rem; }
+  .card h3 { margin:.2rem 0 .4rem; font-size:1.05rem; }
+  .card .ic { font-size:1.4rem; }
+  .card p { margin:0; color:var(--dim); font-size:.94rem; }
+
+  pre { background:#0a0c10; border:1px solid var(--line); border-radius:10px; padding:1rem 1.15rem; overflow-x:auto; font-size:.86rem; line-height:1.5; }
+  .cmt { color:#5b6577; }
+  .str { color:var(--green); } .fn { color:var(--cyan); } .kw { color:var(--magenta); }
+  .tabs { display:flex; gap:.4rem; margin-bottom:.6rem; flex-wrap:wrap; }
+  .tab { padding:.3rem .8rem; border:1px solid var(--line); border-radius:7px; background:var(--panel2); cursor:pointer; font:600 .82rem/1 ui-monospace,monospace; color:var(--dim); }
+  .tab.on { color:#12060f; background:var(--gold); border-color:var(--gold); }
+
+  .demos { display:grid; gap:.6rem; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); }
+  .demo { display:flex; align-items:center; justify-content:space-between; gap:.75rem;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:.7rem .9rem; }
+  .demo .meta small { color:var(--dim); display:block; font-size:.8rem; }
+
+  footer { padding:2.4rem 0 3rem; color:var(--dim); font-size:.9rem; }
+  footer a { color:var(--dim); text-decoration:underline; }
+  .swatch { display:inline-block; width:.7em; height:.7em; border-radius:2px; vertical-align:baseline; margin-right:.15em; }
+</style>
+</head>
+<body>
+
+<header>
+  <img class="hero-img" src="assets/banner.png" alt="cozy-tracker">
+  <div class="hero-copy">
+    <h1>adaptive game music, generated</h1>
+    <p class="tagline">Describe the mood — get a score that <b>reacts to your game</b>.</p>
+    <p class="sub">One tiny module that layers, transitions, and re-scores itself in real time.
+      No stem stacks. No crossfade rigs. ~30&nbsp;KB, cleared to ship.</p>
+    <div class="cta">
+      <a class="btn primary" href="player/?song=../demos/night_bus.it">▶ Open the player</a>
+      <a class="btn" href="https://github.com/c0ze/cozy-tracker">GitHub</a>
+    </div>
+  </div>
+</header>
+
+<section id="why">
+  <div class="wrap">
+    <h2><span class="k">Why it exists</span>Game music shouldn't be a flat loop.</h2>
+    <p class="lead">You get two bad options: license an eight-bar loop that plays the same whether the
+      player is picking flowers or fighting for their life — or hand-build a multi-stem crossfade rig
+      that bloats your download and still only fades between fixed mixes. Interactive worlds deserve
+      music that reacts like the rest of the game does. cozy-tracker generates music that <em>is</em>
+      the adaptive system: described in plain language, rendered from a clean-to-ship sample library,
+      dropped into your engine with two lines of code.</p>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2><span class="k">What makes it different</span>Not a music player. A music <em>system</em>.</h2>
+    <div class="grid">
+      <div class="card"><div class="ic">🎚️</div><h3>Adaptive by construction</h3>
+        <p>Each instrument is its own channel. Intensity is just muting layers; transitions are jumps between named sections — sample-accurate, one file, zero crossfades.</p></div>
+      <div class="card"><div class="ic">✨</div><h3>Generated, not hand-drawn</h3>
+        <p>Describe it, get it. Batch a whole soundtrack in CI. Spin twelve variations for procedural levels from a seed.</p></div>
+      <div class="card"><div class="ic">🌉</div><h3>LLM transitions</h3>
+        <p>Ask for a bridge that walks your combat theme into exploration — matched in key and tempo — and get a module that connects them.</p></div>
+      <div class="card"><div class="ic">⚖️</div><h3>Cleared to ship</h3>
+        <p>Every sound traces to a public-domain or CC0 source in a provenance ledger. No sample-license landmines in your release.</p></div>
+      <div class="card"><div class="ic">🪶</div><h3>Kilobytes, not megabytes</h3>
+        <p>An adaptive score is tens of KB. A five-stem rig is tens of MB. That gap decides whether your web or mobile game ships with music.</p></div>
+      <div class="card"><div class="ic">🧪</div><h3>Music QA, automated</h3>
+        <p>A linter catches dissonance and register clashes before you hear them. Offline rendering + metering make a soundtrack you can regression-test.</p></div>
+      <div class="card"><div class="ic">🧩</div><h3>Data-driven</h3>
+        <p>Songs are JSON — diffable, versioned, seedable, parameterizable by the game itself. Your soundtrack is source code.</p></div>
+      <div class="card"><div class="ic">🎮</div><h3>Drop-in for every engine</h3>
+        <p>Small runtime bundles for web, Godot, Unity and more expose the same two calls. The hard part — reaching in to mute layers — is done for you.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="dropin">
+  <div class="wrap">
+    <h2><span class="k">Drop it into your game</span>Do your <span class="mono">.it</span>, wrap, drop in.</h2>
+    <p class="lead">Alongside every module, cozy emits a manifest describing its layers and sections.
+      Your game reads the module + manifest and gets <span class="mono">setIntensity()</span> and
+      <span class="mono">transitionTo()</span>.</p>
+    <pre><span class="cmt">// level1.cozy.json  — emitted next to level1.it</span>
+{ <span class="str">"layers"</span>:   { <span class="str">"drums"</span>:[0,1,2], <span class="str">"bass"</span>:[3], <span class="str">"harmony"</span>:[4,6,7], <span class="str">"lead"</span>:[5] },
+  <span class="str">"sections"</span>: { <span class="str">"explore"</span>:[1,4], <span class="str">"combat"</span>:[5,10], <span class="str">"bridge"</span>:[11,11] },
+  <span class="str">"loop"</span>: <span class="str">"explore"</span> }</pre>
+    <div class="tabs">
+      <span class="tab on" data-t="web">web</span>
+      <span class="tab" data-t="godot">godot</span>
+      <span class="tab" data-t="unity">unity</span>
+    </div>
+    <pre id="snippet"></pre>
+  </div>
+</section>
+
+<section id="demos">
+  <div class="wrap">
+    <h2><span class="k">Hear it</span>Five modules, all generated.</h2>
+    <p class="lead">Every track was composed by the pipeline from public-domain samples, then rendered
+      to a self-contained module. Open one in the browser player — pattern view, per-channel
+      solo/mute, oscilloscope.</p>
+    <div class="demos">
+      <div class="demo"><div class="meta">Night Bus<small>laid-back groove · lint-clean</small></div><a class="btn" href="player/?song=../demos/night_bus.it">▶</a></div>
+      <div class="demo"><div class="meta">First Light<small>melodic · key-change climax</small></div><a class="btn" href="player/?song=../demos/first_light.it">▶</a></div>
+      <div class="demo"><div class="meta">Siege Engine<small>aggressive driver</small></div><a class="btn" href="player/?song=../demos/siege_engine.it">▶</a></div>
+      <div class="demo"><div class="meta">Winter Orbit<small>sparse ambient</small></div><a class="btn" href="player/?song=../demos/winter_orbit.it">▶</a></div>
+      <div class="demo"><div class="meta">Paper Hearts<small>chip-pop</small></div><a class="btn" href="player/?song=../demos/paper_hearts.it">▶</a></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p><b style="color:var(--text)">cozy-tracker</b> — describe the mood, get an adaptive score that reacts to your game, in 30&nbsp;KB, cleared to ship.</p>
+    <p>Playback via libopenmpt (BSD). Samples: AKWF &amp; Saga Musix (public-domain / free-use).
+      <a href="https://github.com/c0ze/cozy-tracker">Source on GitHub</a> ·
+      <a href="player/">Player</a></p>
+  </div>
+</footer>
+
+<script>
+  // engine snippet tabs
+  const SNIPPETS = {
+    web:
+`<span class="kw">const</span> music = <span class="kw">new</span> <span class="fn">CozyAdaptive</span>(<span class="str">'level1.it'</span>, <span class="str">'level1.cozy.json'</span>);
+music.<span class="fn">setIntensity</span>(0.7);      <span class="cmt">// mutes layers above the threshold</span>
+music.<span class="fn">transitionTo</span>(<span class="str">'combat'</span>); <span class="cmt">// jumps at the next bar</span>`,
+    godot:
+`<span class="kw">var</span> music = CozyAdaptive.<span class="fn">load</span>(<span class="str">"res://music/level1.it"</span>)
+music.<span class="fn">set_intensity</span>(0.7)
+music.<span class="fn">transition_to</span>(<span class="str">"combat"</span>)`,
+    unity:
+`<span class="kw">var</span> music = CozyAdaptive.<span class="fn">Load</span>(<span class="str">"level1.it"</span>);
+music.<span class="fn">SetIntensity</span>(0.7f);
+music.<span class="fn">TransitionTo</span>(<span class="str">"combat"</span>);`,
+  };
+  const snip = document.getElementById('snippet');
+  const setSnip = (t) => { snip.innerHTML = SNIPPETS[t]; };
+  document.querySelectorAll('.tab').forEach(el => el.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t === el));
+    setSnip(el.dataset.t);
+  }));
+  setSnip('web');
+</script>
+</body>
+</html>
