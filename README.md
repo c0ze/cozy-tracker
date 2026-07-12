@@ -1,4 +1,4 @@
-# mod_music
+# cozy-tracker
 
 Experiments in AI-assisted tracker music: Claude composes Impulse Tracker
 modules, a human polishes them in a real tracker, and the same `.it` files

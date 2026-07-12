@@ -1,4 +1,4 @@
-# mod_music — Stack Research & Decisions (July 2026)
+# cozy-tracker — Stack Research & Decisions (July 2026)
 
 Research into the player / tracker / API combo for AI-assisted tracker music, plus
 license-safe module & sample sources. Three parallel research passes: playback
