@@ -37,6 +37,9 @@ export class CozyAdaptive {
 
   /** Load module + manifest and start (paused audio contexts resume on play). */
   static async create(moduleUrl, manifest, opts = {}) {
+    if (!window.isSecureContext || !('audioWorklet' in (window.AudioContext?.prototype ?? {}))) {
+      throw new Error(`audio needs HTTPS — open https://${location.host}${location.pathname}`);
+    }
     if (typeof manifest === 'string') manifest = await (await fetch(manifest)).json();
     const player = new ChiptuneJsPlayer({ repeatCount: -1, context: opts.context });
     await new Promise((resolve) => player.onInitialized(resolve));

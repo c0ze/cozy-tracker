@@ -120,6 +120,11 @@ export function mountJukebox(container, opts = {}) {
 
   async function ensurePlayer() {
     if (player) return;
+    // AudioWorklet requires a secure context — plain http gets a clear hint
+    if (!window.isSecureContext || !('audioWorklet' in (window.AudioContext?.prototype ?? {}))) {
+      q('.jb-title').innerHTML = `⚠ audio needs HTTPS — try <a href="https://${location.host}${location.pathname}">https://${location.host}</a>`;
+      throw new Error('secure context required for AudioWorklet');
+    }
     player = new ChiptuneJsPlayer({ repeatCount: 0 });
     await new Promise((r) => player.onInitialized(r));
     analyser = player.context.createAnalyser();
@@ -142,7 +147,7 @@ export function mountJukebox(container, opts = {}) {
   }
 
   async function playTrack(i) {
-    await ensurePlayer();
+    try { await ensurePlayer(); } catch { return; } // message already shown
     if (player.context.state === 'suspended') await player.context.resume();
     cur = i;
     lastStart = Date.now();

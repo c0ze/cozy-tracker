@@ -621,6 +621,10 @@ function download(blob, name) {
 
 // ---------- loading ----------
 async function ensurePlayer() {
+  if (!window.isSecureContext || !('audioWorklet' in (window.AudioContext?.prototype ?? {}))) {
+    $('meta').innerHTML = `⚠ audio needs HTTPS — try <a href="https://${location.host}${location.pathname}">https://${location.host}</a>`;
+    throw new Error('secure context required for AudioWorklet');
+  }
   if (!player) initPlayer();
   if (player.context.state === 'suspended') await player.context.resume();
   while (!ready) await new Promise((r) => setTimeout(r, 30));

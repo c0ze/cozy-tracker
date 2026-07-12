@@ -42,7 +42,8 @@
     background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
     mix-blend-mode:multiply;
   }
-  .hero-img { width:100%; display:block; }
+  .hero-img { display:block; width:min(960px, calc(100% - 2.5rem)); margin:1.4rem auto 0;
+    border-radius:14px; border:1px solid var(--line); box-shadow:0 10px 44px rgba(0,0,0,.5); }
   .hero-copy { text-align:center; padding:2.2rem 1.25rem 2.6rem; }
   .hero-copy h1 { font-size:1.05rem; letter-spacing:.34em; color:var(--cyan); margin:0 0 1rem; text-transform:uppercase; }
   .tagline { font-size:clamp(1.4rem,4vw,2.1rem); font-weight:700; line-height:1.25; margin:0 auto; max-width:20ch; }
