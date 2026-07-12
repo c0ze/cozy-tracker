@@ -123,6 +123,7 @@ export class ChiptuneJsPlayer {
 	setTempo(val) { this.postMsg('setTempo', val) }
 	setPos(val) { this.postMsg('setPos', val) }
 	setOrderRow(o,r) { this.postMsg('setOrderRow', {o:o,r:r}) }
+	setChannelMute(ch, mute) { this.postMsg('mute', {ch:ch, mute:mute}) }
 	setVol(val) { this.gain.gain.value = val }
 	selectSubsong(val) { this.postMsg('selectSubsong', val) }
 	// compatibility

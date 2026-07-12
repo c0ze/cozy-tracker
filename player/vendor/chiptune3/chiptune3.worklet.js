@@ -159,6 +159,9 @@ class MPT extends AudioWorkletProcessor {
 				//const extPtr = libopenmpt.openmpt_module_ext_get_interface(mod_ext, interface_id, interface, interface_size)
 				break
 			*/
+			case 'mute':
+				if (this.setChannelMuteFn && this.extPtr) this.setChannelMuteFn(this.extPtr, v.ch, v.mute ? 1 : 0)
+				break
 			case 'decodeAll':
 				this.decodeAll(v)
 				break
@@ -193,18 +196,32 @@ class MPT extends AudioWorkletProcessor {
 
 	play(buffer, paused = false) {
 		this.stop()
-		
+
 		const maxFramesPerChunk = 128	// thats what worklet is using
 		const byteArray = new Int8Array(buffer)
 		const ptrToFile = libopenmpt._malloc(byteArray.byteLength)
 		libopenmpt.HEAPU8.set(byteArray, ptrToFile)
-		this.modulePtr = libopenmpt._openmpt_module_create_from_memory(ptrToFile, byteArray.byteLength, 0, 0, 0)
+		// ext module so we can reach the interactive interface (channel mute etc.)
+		this.extPtr = libopenmpt._openmpt_module_ext_create_from_memory(ptrToFile, byteArray.byteLength, 0, 0, 0, 0, 0, 0, 0)
+		this.modulePtr = this.extPtr ? libopenmpt._openmpt_module_ext_get_module(this.extPtr) : 0
 
 		if(this.modulePtr === 0) {
 			// could not create module
 			this.port.postMessage({cmd:'err',val:'ptr'})
 			return
 		}
+
+		// interactive interface: struct of function pointers; slot 10 = set_channel_mute_status
+		this.setChannelMuteFn = null
+		try {
+			const stack = libopenmpt.stackSave()
+			const ifaceBuf = libopenmpt.stackAlloc(64)
+			if (libopenmpt._openmpt_module_ext_get_interface(this.extPtr, asciiToStack('interactive'), ifaceBuf, 64)) {
+				const dv = new DataView(libopenmpt.HEAPU8.buffer, ifaceBuf, 64)
+				this.setChannelMuteFn = libopenmpt.wasmTable.get(dv.getUint32(10 * 4, true))
+			}
+			libopenmpt.stackRestore(stack)
+		} catch (e) { /* mute unavailable in this build */ }
 
 		if (libopenmpt.stackSave) {
 			const stack = libopenmpt.stackSave()
@@ -230,7 +247,11 @@ class MPT extends AudioWorkletProcessor {
 	}
 	stop() {
 		if (!this.modulePtr) return
-		if (this.modulePtr != 0) {
+		if (this.extPtr) {
+			libopenmpt._openmpt_module_ext_destroy(this.extPtr)
+			this.extPtr = 0
+			this.modulePtr = 0
+		} else if (this.modulePtr != 0) {
 			libopenmpt._openmpt_module_destroy(this.modulePtr)
 			this.modulePtr = 0
 		}

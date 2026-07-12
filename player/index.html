@@ -112,6 +112,15 @@ let cur = { order: 0, pattern: 0, row: 0, pos: 0 };
 let dispRow = 0;
 let vu = [], vuDisp = [];
 let analyser = null, scopeData = null;
+let chMute = [], chSolo = null; // per-channel mute + solo state
+
+const effMuted = (c) => chSolo !== null ? c !== chSolo : !!chMute[c];
+function applyMutes() {
+  if (!player || !song) return;
+  (song.channels || []).forEach((_, c) => player.setChannelMute(c, effMuted(c)));
+}
+function toggleMute(c) { chMute[c] = !chMute[c]; applyMutes(); }
+function toggleSolo(c) { chSolo = chSolo === c ? null : c; applyMutes(); }
 
 // ---------- edit state ----------
 let edit = null;          // { json, url, dirty } — present when a .json song is loaded
@@ -128,8 +137,10 @@ const fmt = (s) => (s === undefined || isNaN(s)) ? '--:--' : `${Math.floor(s / 6
 
 function initPlayer() {
   player = new ChiptuneJsPlayer({ repeatCount: -1 });
+  window.__player = player; // debug handle
   player.onInitialized(() => {
     ready = true;
+    if (player.processNode) player.processNode.onprocessorerror = (e) => console.error('worklet processor died', e);
     analyser = player.context.createAnalyser();
     analyser.fftSize = 2048;
     scopeData = new Float32Array(analyser.fftSize);
@@ -144,7 +155,10 @@ function initPlayer() {
     $('meta').textContent =
       `${meta.tracker || '?'} · ${(song.channels || []).length}ch · ${meta.totalPatterns} patterns · ${meta.totalOrders} orders · ${fmt(meta.dur)}` +
       (meta.message ? `\n${meta.message.replace(/\n+/g, ' — ')}` : '');
-    vuDisp = new Array((song.channels || []).length).fill(0);
+    const nCh = (song.channels || []).length;
+    vuDisp = new Array(nCh).fill(0);
+    if (chMute.length !== nCh) { chMute = new Array(nCh).fill(false); chSolo = null; }
+    applyMutes(); // re-apply across recompiles (worklet resets on new module)
     patCache.clear();
     buildOrderStrip();
   });
@@ -306,18 +320,28 @@ function drawPattern() {
   ctx.beginPath(); ctx.moveTo(0, headH - .5); ctx.lineTo(w, headH - .5); ctx.stroke();
   for (let c = 0; c < nCh; c++) {
     const x = rowNumW + c * chW + 6;
+    const muted = effMuted(c);
     const level = vu[c] ? Math.min(1, (vu[c].left + vu[c].right) / 1.6) : 0;
     vuDisp[c] = Math.max(level, (vuDisp[c] || 0) * 0.88);
     ctx.fillStyle = 'rgba(255,255,255,.07)';
     ctx.fillRect(x, headH - 10, chW - 14, 5);
-    ctx.fillStyle = chColor(c, 60, .95);
-    ctx.shadowColor = chColor(c, 60, .9); ctx.shadowBlur = vuDisp[c] * 10;
+    ctx.fillStyle = chColor(c, 60, muted ? 0.25 : 0.95);
+    ctx.shadowColor = chColor(c, 60, .9); ctx.shadowBlur = muted ? 0 : vuDisp[c] * 10;
     ctx.fillRect(x, headH - 10, (chW - 14) * vuDisp[c], 5);
     ctx.shadowBlur = 0;
-    ctx.fillStyle = editMode && c === cursor.ch ? '#e0a458' : chColor(c, 72);
+    ctx.fillStyle = editMode && c === cursor.ch ? '#e0a458' : chColor(c, 72, muted ? 0.35 : 1);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     ctx.font = `bold 11px ui-monospace, Menlo, monospace`;
-    ctx.fillText((song.channels[c] || `ch ${c}`).slice(0, Math.floor(chW / 7)), x, headH - 16);
+    ctx.fillText((song.channels[c] || `ch ${c}`).slice(0, Math.floor((chW - 40) / 7)), x, headH - 16);
+    // M / S buttons
+    for (const [i, [label, on, color]] of [['M', chMute[c], '#e05a5a'], ['S', chSolo === c, '#e0c058']].entries()) {
+      const bx = x + chW - 44 + i * 16;
+      ctx.fillStyle = on ? color : 'rgba(255,255,255,.08)';
+      ctx.fillRect(bx, 5, 13, 13);
+      ctx.fillStyle = on ? '#0d0f14' : 'rgba(255,255,255,.45)';
+      ctx.font = `bold 9px ui-monospace, Menlo, monospace`;
+      ctx.fillText(label, bx + 3.5, 15);
+    }
   }
 }
 
@@ -683,15 +707,25 @@ $('vol').oninput = () => player && player.setVol(parseFloat($('vol').value));
 $('tempo').oninput = () => player && player.setTempo(parseFloat($('tempo').value));
 $('pitch').oninput = () => player && player.setPitch(parseFloat($('pitch').value));
 
-// click grid to place cursor
+// click grid: header = mute/solo buttons, body = place edit cursor
 patC.addEventListener('mousedown', (e) => {
-  if (!editMode || !song) return;
+  if (!song) return;
   const r = patC.getBoundingClientRect();
   const x = e.clientX - r.left, y = e.clientY - r.top;
   const { rowH, headH, rowNumW } = LAYOUT;
   const nCh = (song.channels || []).length;
   const chW = Math.max(112, (r.width - rowNumW - 8) / nCh);
-  if (y < headH) return;
+  if (y < headH) {
+    const c = Math.floor((x - rowNumW) / chW);
+    if (c < 0 || c >= nCh) return;
+    const relX = x - (rowNumW + c * chW + 6);
+    if (y >= 4 && y <= 18) {
+      if (relX >= chW - 44 && relX < chW - 31) return toggleMute(c);
+      if (relX >= chW - 28 && relX < chW - 15) return toggleSolo(c);
+    }
+    return;
+  }
+  if (!editMode) return;
   const centerY = headH + (r.height - headH) / 2;
   const row = Math.round(dispRow + (y - centerY) / rowH);
   const ch = Math.floor((x - rowNumW) / chW);
