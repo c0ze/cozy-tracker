@@ -76,3 +76,20 @@ fs.mkdirSync(path.dirname(outFile), { recursive: true });
 const buf = itwriter(song);
 fs.writeFileSync(outFile, Buffer.from(buf));
 console.log(`${outFile} (${buf.byteLength} bytes, ${song.samples.length} samples, ${song.patterns.length} patterns, order length ${song.order.length})`);
+
+// adaptive manifest: emitted next to the .it so game runtimes (CozyAdaptive)
+// can drive layers and sections. Validated lightly here.
+if (song.adaptive) {
+  const a = song.adaptive;
+  const nCh = Math.max(...song.patterns.map((p) => p.channels.length));
+  for (const l of a.layers || []) {
+    for (const c of l.channels) if (c >= nCh) console.warn(`manifest: layer "${l.name}" references channel ${c} (song has ${nCh})`);
+  }
+  for (const [name, [s, e]] of Object.entries(a.sections || {})) {
+    if (s > e || e >= song.order.length) console.warn(`manifest: section "${name}" [${s},${e}] outside order list (length ${song.order.length})`);
+  }
+  if (a.loop && !(a.sections || {})[a.loop]) console.warn(`manifest: loop section "${a.loop}" not defined`);
+  const mFile = outFile.replace(/\.it$/, ".cozy.json");
+  fs.writeFileSync(mFile, JSON.stringify(a, null, 1));
+  console.log(`${mFile} (adaptive manifest: ${(a.layers || []).length} layers, ${Object.keys(a.sections || {}).length} sections)`);
+}

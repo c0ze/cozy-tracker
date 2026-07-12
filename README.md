@@ -68,6 +68,23 @@ end-to-end as a single-cycle waveform and tunes it automatically.
 libopenmpt WASM the player uses, and prints duration/peak/RMS/clipping stats
 (add `--stats-only` to skip the WAV). This is how the agent checks its own output.
 
+## Adaptive music (CozyAdaptive)
+
+Songs can declare an `adaptive` block (intensity-ordered layers + named
+sections); `json2it` then emits a `<name>.cozy.json` manifest next to the
+`.it`. The web runtime [player/cozy-adaptive.js](player/cozy-adaptive.js)
+pairs the two:
+
+```js
+const music = await CozyAdaptive.create('siege_engine.it', 'siege_engine.cozy.json');
+music.setIntensity(0.7);                          // layer muting, sample-accurate
+music.transitionTo('combat', { via: 'bridge' });  // jump at the next pattern boundary
+```
+
+Sections loop themselves until a transition is requested. Live demo on the
+landing page ([index.html](index.html)). See
+[docs/positioning.md](docs/positioning.md) for the why.
+
 ## Analyzing modules
 
 `node tools/analyze.js <module>` prints structure + stats (tempo, channels,

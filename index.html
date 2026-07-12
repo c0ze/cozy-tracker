@@ -136,9 +136,13 @@
     <p class="lead">Alongside every module, cozy emits a manifest describing its layers and sections.
       Your game reads the module + manifest and gets <span class="mono">setIntensity()</span> and
       <span class="mono">transitionTo()</span>.</p>
-    <pre><span class="cmt">// level1.cozy.json  — emitted next to level1.it</span>
-{ <span class="str">"layers"</span>:   { <span class="str">"drums"</span>:[0,1,2], <span class="str">"bass"</span>:[3], <span class="str">"harmony"</span>:[4,6,7], <span class="str">"lead"</span>:[5] },
-  <span class="str">"sections"</span>: { <span class="str">"explore"</span>:[1,4], <span class="str">"combat"</span>:[5,10], <span class="str">"bridge"</span>:[11,11] },
+    <pre><span class="cmt">// siege_engine.cozy.json — emitted next to siege_engine.it (real output)</span>
+{ <span class="str">"layers"</span>: [ { <span class="str">"name"</span>:<span class="str">"core"</span>,  <span class="str">"channels"</span>:[3,4],   <span class="str">"above"</span>:0    },
+             { <span class="str">"name"</span>:<span class="str">"riff"</span>,  <span class="str">"channels"</span>:[5],     <span class="str">"above"</span>:0.25 },
+             { <span class="str">"name"</span>:<span class="str">"drums"</span>, <span class="str">"channels"</span>:[0,1,2], <span class="str">"above"</span>:0.45 },
+             { <span class="str">"name"</span>:<span class="str">"stabs"</span>, <span class="str">"channels"</span>:[7],     <span class="str">"above"</span>:0.65 },
+             { <span class="str">"name"</span>:<span class="str">"lead"</span>,  <span class="str">"channels"</span>:[6,8],   <span class="str">"above"</span>:0.8  } ],
+  <span class="str">"sections"</span>: { <span class="str">"explore"</span>:[7,8], <span class="str">"bridge"</span>:[9,9], <span class="str">"combat"</span>:[11,14], <span class="str">"boss"</span>:[16,17] },
   <span class="str">"loop"</span>: <span class="str">"explore"</span> }</pre>
     <div class="tabs">
       <span class="tab on" data-t="web">web</span>
@@ -146,6 +150,39 @@
       <span class="tab" data-t="unity">unity</span>
     </div>
     <pre id="snippet"></pre>
+  </div>
+</section>
+
+<section id="live">
+  <div class="wrap">
+    <h2><span class="k">Feel it</span>The score reacts. Right here.</h2>
+    <p class="lead">This is <em>Siege Engine</em> — one generated 190&nbsp;KB module + its manifest,
+      driven by the same two calls your game would make. Change the game state; the music
+      transitions at the next musical boundary. Drag intensity; layers drop in and out live.</p>
+    <div class="card" id="demoPanel">
+      <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center;">
+        <button class="btn primary" id="dStart">▶ start the demo</button>
+        <span id="dState" class="mono" style="color:var(--dim); font-size:.85rem;"></span>
+      </div>
+      <div id="dControls" style="display:none; margin-top:1rem;">
+        <div style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;">
+          <span style="color:var(--dim); font-size:.85rem;">game state:</span>
+          <button class="btn" data-sec="explore">🌿 Explore</button>
+          <button class="btn" data-sec="combat">⚔️ Combat</button>
+          <button class="btn" data-sec="boss">💀 Boss</button>
+          <label style="color:var(--dim); font-size:.83rem;"><input type="checkbox" id="dVia" checked> route through the bridge</label>
+          <span style="flex:1"></span>
+          <button class="btn" id="dStop">■</button>
+        </div>
+        <div style="display:flex; gap:.8rem; align-items:center; margin-top:.9rem;">
+          <span style="color:var(--dim); font-size:.85rem;">intensity</span>
+          <input type="range" id="dIntensity" min="0" max="1" step="0.01" value="1" style="flex:1; accent-color:var(--gold);">
+          <span id="dLayers" class="mono" style="color:var(--green); font-size:.8rem; min-width:20ch;"></span>
+        </div>
+        <canvas id="dScope" style="width:100%; height:44px; margin-top:.9rem; background:#0a0c10; border-radius:8px;"></canvas>
+      </div>
+      <pre style="margin:.9rem 0 0; font-size:.8rem;" id="dCode"><span class="kw">const</span> music = <span class="kw">await</span> CozyAdaptive.<span class="fn">create</span>(<span class="str">'siege_engine.it'</span>, <span class="str">'siege_engine.cozy.json'</span>);</pre>
+    </div>
   </div>
 </section>
 
@@ -197,6 +234,85 @@ music.<span class="fn">TransitionTo</span>(<span class="str">"combat"</span>);`,
     setSnip(el.dataset.t);
   }));
   setSnip('web');
+</script>
+<script type="module">
+  import { CozyAdaptive } from './player/cozy-adaptive.js';
+
+  let music = null, analyser = null, scopeData = null;
+  const $ = (id) => document.getElementById(id);
+  const codeEl = $('dCode');
+
+  const showCall = (line) => {
+    codeEl.innerHTML = line;
+  };
+
+  $('dStart').addEventListener('click', async () => {
+    if (music) return;
+    $('dStart').disabled = true;
+    $('dState').textContent = 'loading…';
+    try {
+      music = await CozyAdaptive.create('demos/siege_engine.it', 'demos/siege_engine.cozy.json', { intensity: 1 });
+      analyser = music.player.context.createAnalyser();
+      analyser.fftSize = 1024;
+      scopeData = new Float32Array(analyser.fftSize);
+      music.player.gain.connect(analyser);
+      music.onSection((s) => { $('dState').textContent = `section: ${s}`; });
+      music.onProgress((d) => { $('dState').textContent = `section: ${music.section} · ord ${d.order} · row ${String(d.row).padStart(2, '0')}`; });
+      $('dControls').style.display = 'block';
+      $('dLayers').textContent = music.activeLayers().join(' + ');
+      drawScope();
+    } catch (e) {
+      $('dState').textContent = 'demo failed to load: ' + e.message;
+      $('dStart').disabled = false;
+    }
+  });
+
+  document.querySelectorAll('[data-sec]').forEach((btn) => btn.addEventListener('click', () => {
+    if (!music) return;
+    const via = $('dVia').checked && btn.dataset.sec !== 'boss' ? 'bridge' : undefined;
+    music.transitionTo(btn.dataset.sec, { via });
+    showCall(`music.<span class="fn">transitionTo</span>(<span class="str">'${btn.dataset.sec}'</span>${via ? `, { via: <span class="str">'bridge'</span> }` : ''});`);
+  }));
+
+  $('dIntensity').addEventListener('input', (e) => {
+    if (!music) return;
+    music.setIntensity(parseFloat(e.target.value));
+    $('dLayers').textContent = music.activeLayers().join(' + ') || '(silence)';
+    showCall(`music.<span class="fn">setIntensity</span>(${(+e.target.value).toFixed(2)});  <span class="cmt">// ${music.activeLayers().join(' + ') || 'all layers muted'}</span>`);
+  });
+
+  $('dStop').addEventListener('click', () => {
+    if (!music) return;
+    music.stop();
+    music = null;
+    $('dControls').style.display = 'none';
+    $('dStart').disabled = false;
+    $('dState').textContent = '';
+    showCall(`<span class="kw">const</span> music = <span class="kw">await</span> CozyAdaptive.<span class="fn">create</span>(<span class="str">'siege_engine.it'</span>, <span class="str">'siege_engine.cozy.json'</span>);`);
+  });
+
+  function drawScope() {
+    if (!music) return;
+    requestAnimationFrame(drawScope);
+    const c = $('dScope');
+    const dpr = devicePixelRatio || 1;
+    const r = c.getBoundingClientRect();
+    if (c.width !== Math.round(r.width * dpr)) { c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); }
+    const ctx = c.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, r.width, r.height);
+    analyser.getFloatTimeDomainData(scopeData);
+    const grad = ctx.createLinearGradient(0, 0, r.width, 0);
+    grad.addColorStop(0, '#4fc1ff'); grad.addColorStop(.5, '#ff5ac0'); grad.addColorStop(1, '#e0a458');
+    ctx.strokeStyle = grad; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const step = scopeData.length / r.width;
+    for (let x = 0; x < r.width; x++) {
+      const y = r.height / 2 - (scopeData[Math.floor(x * step)] || 0) * r.height * .45;
+      x ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+  }
 </script>
 </body>
 </html>

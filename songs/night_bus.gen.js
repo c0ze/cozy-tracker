@@ -151,4 +151,23 @@ writeSong(import.meta.url, {
   channelnames: { 0: "drums", 1: "hat", 2: "bass", 3: "keys1", 4: "keys2", 5: "keys3" },
   order: [P0, P1, P1, P2, P2, P3, P3, P2b, P2b, P4, P1, P3, P5],
   patterns,
+  // adaptive manifest — emitted as build/night_bus.cozy.json by json2it
+  adaptive: {
+    layers: [
+      { name: "bass", channels: [2], above: 0 },
+      { name: "hat", channels: [1], above: 0.3 },
+      { name: "drums", channels: [0], above: 0.5 },
+      { name: "keys", channels: [3, 4, 5], above: 0.7 },
+    ],
+    sections: {
+      intro: [0, 0],
+      groove: [1, 2],
+      lead: [3, 4],
+      full: [5, 6],
+      leadB: [7, 8],
+      breakdown: [9, 9],
+      outro: [12, 12],
+    },
+    loop: "groove",
+  },
 });

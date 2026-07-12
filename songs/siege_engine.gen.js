@@ -188,4 +188,25 @@ writeSong(import.meta.url, {
   channelnames: { 0: "kick/hat", 1: "snare", 2: "fx", 3: "bass", 4: "drone", 5: "riff", 6: "lead", 7: "stabs", 8: "canon" },
   order: [P0, P1, P1, P2, P3, P3, P4, P5, P5, P6, P7, P8, P8, P9, P9, P6, P10, P10, P5, P5, P11],
   patterns,
+  // adaptive manifest — emitted as build/siege_engine.cozy.json by json2it.
+  // layers: ordered by intensity; a layer sounds while intensity >= above.
+  // sections: [firstOrder, lastOrder] ranges in the order list above.
+  adaptive: {
+    layers: [
+      { name: "core", channels: [3, 4], above: 0 },        // bass + drone
+      { name: "riff", channels: [5], above: 0.25 },
+      { name: "drums", channels: [0, 1, 2], above: 0.45 },
+      { name: "stabs", channels: [7], above: 0.65 },
+      { name: "lead", channels: [6, 8], above: 0.8 },      // wail + canon
+    ],
+    sections: {
+      intro: [0, 2],
+      explore: [7, 8],    // theme A pump
+      bridge: [9, 9],     // breakdown — natural transition material
+      combat: [11, 14],   // theme B march + peak
+      boss: [16, 17],     // climax chains
+      finale: [20, 20],
+    },
+    loop: "explore",
+  },
 });
