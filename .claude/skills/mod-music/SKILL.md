@@ -185,6 +185,19 @@ leads, pad + pad-a-fifth-up panned apart.
   grant covers pattern data. Rebuild timbres from AKWF/Saga instead of extracting.
 - Shipping `.it` files ships extractable PCM — only CC0/PD samples go into modules.
 
+## Adaptive scores & bridges
+
+Songs may declare an `adaptive` block (intensity-ordered `layers` with
+`above` thresholds, named `sections` as [firstOrder,lastOrder], `loop`);
+json2it emits `<name>.cozy.json` beside the .it and the web runtime
+`player/cozy-adaptive.js` drives it (`setIntensity`, `transitionTo(name,
+{via})`; sections self-loop). To connect two songs, compose a bridge and
+merge with `tools/merge.js` (`mergeSongs(a, b, {bridge: (ctx) => ...})`) —
+see songs/siege_to_night.gen.js as the reference: pick a harmonic pivot
+(dominant of the target key is ideal), ramp tempo with Txx stamps, hand
+material from A's instruments to B's, keep the restraint rules. Bridge
+patterns must lint clean.
+
 ## Game embedding
 
 Same `.it` plays bit-identically everywhere via libopenmpt: web = `chiptune3`

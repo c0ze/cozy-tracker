@@ -183,6 +183,23 @@
       </div>
       <pre style="margin:.9rem 0 0; font-size:.8rem;" id="dCode"><span class="kw">const</span> music = <span class="kw">await</span> CozyAdaptive.<span class="fn">create</span>(<span class="str">'siege_engine.it'</span>, <span class="str">'siege_engine.cozy.json'</span>);</pre>
     </div>
+
+    <h2 style="margin-top:2.6rem;"><span class="k">Two songs, one file</span>A generated bridge between them.</h2>
+    <p class="lead">Combat music and exploration music are <em>different songs</em> — different key,
+      tempo, and feel. cozy composed a bridge that walks one into the other (an E pedal resolving
+      into A&nbsp;minor while the clock ramps 150&nbsp;→&nbsp;112&nbsp;BPM) and merged all three into a
+      single 280&nbsp;KB module. One call crosses between songs, musically.</p>
+    <div class="card">
+      <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center;">
+        <button class="btn primary" id="bStart">▶ start</button>
+        <button class="btn" id="bSiege" style="display:none;">⚔️ Siege Engine</button>
+        <button class="btn" id="bNight" style="display:none;">🌙 Night Bus</button>
+        <span id="bState" class="mono" style="color:var(--dim); font-size:.85rem;"></span>
+        <span style="flex:1"></span>
+        <button class="btn" id="bStop" style="display:none;">■</button>
+      </div>
+      <pre style="margin:.9rem 0 0; font-size:.8rem;" id="bCode"><span class="kw">const</span> music = <span class="kw">await</span> CozyAdaptive.<span class="fn">create</span>(<span class="str">'siege_to_night.it'</span>, <span class="str">'siege_to_night.cozy.json'</span>);</pre>
+    </div>
   </div>
 </section>
 
@@ -289,6 +306,42 @@ music.<span class="fn">TransitionTo</span>(<span class="str">"combat"</span>);`,
     $('dStart').disabled = false;
     $('dState').textContent = '';
     showCall(`<span class="kw">const</span> music = <span class="kw">await</span> CozyAdaptive.<span class="fn">create</span>(<span class="str">'siege_engine.it'</span>, <span class="str">'siege_engine.cozy.json'</span>);`);
+  });
+
+  // --- demo 2: two songs, one file, generated bridge ---
+  let music2 = null;
+  const bCode = $('bCode');
+  $('bStart').addEventListener('click', async () => {
+    if (music2) return;
+    if (music) $('dStop').click(); // one demo at a time
+    $('bStart').disabled = true;
+    $('bState').textContent = 'loading…';
+    try {
+      music2 = await CozyAdaptive.create('demos/siege_to_night.it', 'demos/siege_to_night.cozy.json', { intensity: 1 });
+      music2.onProgress((d) => { $('bState').textContent = `section: ${music2.section} · ord ${d.order}`; });
+      for (const id of ['bSiege', 'bNight', 'bStop']) $(id).style.display = 'inline-block';
+    } catch (e) {
+      $('bState').textContent = 'demo failed to load: ' + e.message;
+      $('bStart').disabled = false;
+    }
+  });
+  $('bNight').addEventListener('click', () => {
+    if (!music2) return;
+    music2.transitionTo('nb:groove', { via: 'bridge' });
+    bCode.innerHTML = `music.<span class="fn">transitionTo</span>(<span class="str">'nb:groove'</span>, { via: <span class="str">'bridge'</span> });  <span class="cmt">// E pedal → Am, 150 → 112 BPM</span>`;
+  });
+  $('bSiege').addEventListener('click', () => {
+    if (!music2) return;
+    music2.transitionTo('siege:explore', { via: 'siege:bridge' });
+    bCode.innerHTML = `music.<span class="fn">transitionTo</span>(<span class="str">'siege:explore'</span>, { via: <span class="str">'siege:bridge'</span> });`;
+  });
+  $('bStop').addEventListener('click', () => {
+    if (!music2) return;
+    music2.stop();
+    music2 = null;
+    for (const id of ['bSiege', 'bNight', 'bStop']) $(id).style.display = 'none';
+    $('bStart').disabled = false;
+    $('bState').textContent = '';
   });
 
   function drawScope() {

@@ -85,6 +85,21 @@ Sections loop themselves until a transition is requested. Live demo on the
 landing page ([index.html](index.html)). See
 [docs/positioning.md](docs/positioning.md) for the why.
 
+### Bridging two songs into one module
+
+[tools/merge.js](tools/merge.js) merges two songs plus a composed bridge into
+a single adaptive module: B's channels/instruments are remapped after A's,
+every pattern's row 0 is stamped with its song's tempo/speed/loudness
+(Txx/Axx/Vxx on control channels), and section names get prefixed. The bridge
+itself is authored music — see
+[songs/siege_to_night.gen.js](songs/siege_to_night.gen.js), which walks
+Siege Engine (E minor, 150 BPM) into Night Bus (A minor, 112 BPM) over an
+E pedal (v→i) with a stepped tempo ramp. Then:
+
+```js
+music.transitionTo('nb:groove', { via: 'bridge' }); // cross songs, musically
+```
+
 ## Analyzing modules
 
 `node tools/analyze.js <module>` prints structure + stats (tempo, channels,
