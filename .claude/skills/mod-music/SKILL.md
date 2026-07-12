@@ -20,9 +20,33 @@ Browser player (human listening): `python3 -m http.server 8123` →
 `http://localhost:8123/player/`, load `../build/<name>.it`.
 Human editing: Schism Tracker opens/saves the same `.it` files.
 
-**Always verify after composing:** compile, then `render --stats-only`.
-Healthy targets: peak −6..−1 dBFS, no clipped samples, RMS −18..−10 dBFS.
+**Always verify after composing:** compile, then `render --stats-only`, then
+`node tools/lint.js songs/<name>.json` — the lint MUST be clean before a song
+is done. It simulates note durations and flags forgotten sustains, register
+clashes (seconds/b9 between ringing notes), and overcrowding.
+Healthy render targets: peak −6..−1 dBFS, no clipped samples, RMS −18..−10 dBFS.
 If peak > 0 dBFS, lower `mixvol` or per-sample `volume`.
+
+## RESTRAINT RULES (Arda's feedback — non-negotiable)
+
+Past songs failed on two counts: too many things happening at once, and
+notes left ringing that clash with later notes ("a note does not only exist
+where it begins"). The rules, validated by the corpus studies:
+
+1. **Swap, don't stack.** Budget ~4 elements: bass, ONE chord gesture,
+   drums, hat. A lead enters only by REPLACING something (drop the chords
+   for the lead section). Never add a 5th layer onto an intact 4.
+2. **Write the death of every sustained note at composition time.** Looped
+   samples ring FOREVER: every such note needs `==`, a fade, a re-strike,
+   or a next note within ~16 rows. Keep sustains short by default.
+3. **Register bands with buffer octaves.** Bass in one octave, chords in
+   one octave band (spread voices by PAN, not pitch), lead 1-2 octaves
+   above the chord top. Know what is ringing in a register before adding
+   a note there.
+4. **Echo is written, not left to ring**: clone 1 row late at ~45% volume
+   with its own note-ends (2+ row delays clash with moving lines).
+5. Two chords can carry a whole song; vary repeats with pan, one added
+   stab, or a fill — not new material.
 
 ## Song JSON format
 
@@ -125,15 +149,18 @@ vibrato 4→`H`, tone porta 3→`G`, set vol C→vol column, vol slide A→`D`, 
 
 ## Deep-dive technique library
 
-`docs/corpus-studies.md` holds pattern-level studies of three contrasting
-Drozerix modules with adoptable recipes: **her_kiss** (melodic chip-pop:
+`docs/corpus-studies.md` holds pattern-level studies of five Drozerix
+modules with adoptable recipes: **this_is_how_we_do_it** (RESTRAINT: swap
+don't stack, written note-deaths, register bands — read this one first),
+**silicon_dancer** (4ch discipline: row-0 kills, gated chords, motion from
+parameters, interleaved dual-role channels), **her_kiss** (melodic chip-pop:
 liquid-harp channel, chord-carrying melody, bass-as-drums, chorus-first
 re-orchestration), **war_path** (aggressive: choked octave bass,
 ghost-accent snare march, drone + bVII turnaround, canon echo, pump pad),
 **sleepy_snow** (ambient: slow clock, split arpeggios, channel echo
 cascades, shimmer-hold vibrato, phrase-length patterns, exhale cells).
-Read it before composing; reference implementations live in
-songs/paper_hearts.gen.js, songs/siege_engine.gen.js, songs/winter_orbit.gen.js.
+Read it before composing; reference implementations live in songs/*.gen.js —
+night_bus.gen.js is the restraint-rules reference (lint-clean).
 Shared note-math/melody helpers: songs/lib.js. Synth waves now include
 "pluck" (tuned music-box bell with natural decay).
 

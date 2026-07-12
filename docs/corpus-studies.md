@@ -1,9 +1,52 @@
 # Corpus studies — Drozerix deep dives (July 2026)
 
-Distilled from full pattern-level analysis of three contrasting PD modules
+Distilled from full pattern-level analysis of five PD modules
 (via `tools/analyze.js`). Adopted in: `songs/paper_hearts.gen.js`,
-`songs/siege_engine.gen.js`, `songs/winter_orbit.gen.js`.
+`songs/siege_engine.gen.js`, `songs/winter_orbit.gen.js`, `songs/night_bus.gen.js`.
 XM effects cited here map to IT as: 0→J, 3→G, 4→H, 9→O, A→D, 1/2→F/E, EC→SC.
+
+## this_is_how_we_do_it.xm — minimal groove (109 BPM, speed 6, 8ch, 9 patterns)
+
+The restraint masterclass: 5 instruments, no vibrato/porta/arpeggio effects at
+all — all dynamics via volume and pan columns. 3-4 elements sounding at any
+moment; the busiest bar has 5 and even then the lead physically replaces a
+chord note. Two chords total (Fm7 3 bars → Gbmaj9 1 bar).
+
+1. **Swap, don't stack**: budget 4 elements (bass, one chord gesture, drums,
+   hat). A lead enters only by REPLACING something — the chord channels are
+   deleted for the whole lead section.
+2. **Write the death of every sustained note**: chords ring 8-16 rows then
+   are re-struck or faded v07→v00 with `===` after; lead phrases end `===`
+   plus a volume-fade tail. Nothing rings unattended, ever.
+3. **One octave band per role, a buffer octave between**: bass oct 4,
+   chords oct 5 (5 voices within ~14 semitones, spread by PAN not pitch),
+   lead oct 7, percussion owns oct 6. Zero pitched overlap in the module.
+4. **Echo is written, not left to ring**: bass ghosts = same note 1-2 rows
+   later at v20/v10 with 9xx offset; lead clone 1 row late on a spare
+   channel, with its own explicit fades.
+5. **Vary repeats with pan/one-stab/fill, not new material**; E61 pattern-
+   loop doubles patterns for free. 2 chords + 2 drum bars carry 97 seconds
+   because sections mute different roles (drums-only / chords-only / lead-only).
+
+## silicon_dancer.mod — 4-channel discipline (125 BPM, speed 6, 225s)
+
+MOD, so no volume column: 9xx offset (635 uses!) and Cxx (589) do everything.
+
+1. **Channel roles rotate per section**; within one pattern a channel serves
+   two roles by INTERLEAVING (snare ghosts dropped into the bass line's
+   rests — the bass is written around them). No channel owns drums.
+2. **Row-0 kill**: first row of a pattern explicitly silences (C00) whatever
+   the previous pattern left ringing. Standard hygiene.
+3. **Gated chords**: looped chord sample retriggered C30→C00→C30→C00 as a
+   rhythmic pulse — sustained sound, zero unattended ringing.
+4. **Motion from parameters, not pitches**: hold one note and walk 9xx
+   offsets (fake filter sweep), volume gates, instrument-retrigger + A0x
+   pump. Busy texture with no new harmonic events.
+5. **Perceived density**: same-channel echo (previous pitch repeated at C20
+   on odd rows), cross-channel 2-3-row delay lines at 1/3 volume, ramping
+   vibrato on long notes. At any instant only 1-2 channels move fast.
+6. Deliberate ringing exists ONCE per section: a crash decaying into an
+   empty half-pattern (D00 break) as a transition.
 
 ## her_kiss.xm — dense 4-channel melodic chip (128 BPM, speed 3, D aeolian)
 
