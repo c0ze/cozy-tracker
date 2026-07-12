@@ -82,14 +82,16 @@
 
 <header>
   <img class="hero-img" src="assets/banner.png" alt="cozy-tracker">
+  <div class="wrap" style="padding-top:1.1rem; position:relative; z-index:1;">
+    <div id="jukebox"></div>
+  </div>
   <div class="hero-copy">
     <h1>adaptive game music, generated</h1>
     <p class="tagline">Describe the mood — get a score that <b>reacts to your game</b>.</p>
     <p class="sub">One tiny module that layers, transitions, and re-scores itself in real time.
       No stem stacks. No crossfade rigs. ~30&nbsp;KB, cleared to ship.</p>
     <div class="cta">
-      <a class="btn primary" href="listen/">🎧 Listen</a>
-      <a class="btn" href="player/?song=../demos/night_bus.it">Open the tracker</a>
+      <a class="btn primary" href="player/?song=../demos/night_bus.it">Open the tracker</a>
       <a class="btn" href="https://github.com/c0ze/cozy-tracker">GitHub</a>
     </div>
   </div>
@@ -253,6 +255,10 @@ music.<span class="fn">TransitionTo</span>(<span class="str">"combat"</span>);`,
     setSnip(el.dataset.t);
   }));
   setSnip('web');
+</script>
+<script type="module">
+  import { mountJukebox } from './listen/jukebox.js';
+  mountJukebox(document.getElementById('jukebox'), { base: 'demos/', collapsedPlaylist: true });
 </script>
 <script type="module">
   import { CozyAdaptive } from './player/cozy-adaptive.js';
