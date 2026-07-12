@@ -1,3 +1,5 @@
+![cozy-tracker](assets/banner.png)
+
 # cozy-tracker
 
 Experiments in AI-assisted tracker music: Claude composes Impulse Tracker
