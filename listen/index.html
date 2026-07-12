@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cozy-tracker — listen</title>
+<link rel="icon" href="../assets/logo.png">
+<style>
+  :root {
+    --bg:#0b0d12; --panel:#14171f; --panel2:#1b1f2b; --line:#2a3040;
+    --text:#e6e9ef; --dim:#8b93a7;
+    --cyan:#4fc1ff; --magenta:#ff5ac0; --gold:#e0a458; --green:#7ee787;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--text); min-height:100vh;
+    font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  .mono { font-family:ui-monospace,"SF Mono",Menlo,monospace; }
+  a { color:var(--cyan); text-decoration:none; }
+  .wrap { max-width:760px; margin:0 auto; padding:1.5rem 1.25rem 3rem; }
+  header { display:flex; align-items:center; gap:.75rem; margin-bottom:1.2rem; }
+  header img { width:34px; height:34px; border-radius:8px; }
+  header h1 { font:600 .95rem/1 ui-monospace,monospace; letter-spacing:.18em; color:var(--cyan); margin:0; }
+  header h1 small { color:var(--dim); letter-spacing:.05em; }
+  header nav { margin-left:auto; font-size:.85rem; display:flex; gap:1rem; }
+  header nav a { color:var(--dim); }
+  header nav a:hover { color:var(--cyan); }
+
+  .deck { background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  #viz { display:block; width:100%; height:220px; background:#0a0c10; cursor:pointer; }
+  .vizbar { display:flex; align-items:center; gap:.4rem; padding:.5rem .9rem; border-top:1px solid var(--line); }
+  .vmode {
+    font:600 .72rem/1 ui-monospace,monospace; letter-spacing:.08em; color:var(--dim);
+    background:var(--panel2); border:1px solid var(--line); border-radius:6px;
+    padding:.3rem .6rem; cursor:pointer;
+  }
+  .vmode.on { color:#0b0d12; background:var(--cyan); border-color:var(--cyan); }
+  .now { padding: .9rem 1rem .4rem; display:flex; align-items:baseline; gap:.8rem; }
+  #nowTitle { font-size:1.15rem; font-weight:700; }
+  #nowTime { margin-left:auto; color:var(--dim); font-size:.85rem; }
+
+  .controls { display:flex; gap:.5rem; align-items:center; padding: .6rem 1rem 1rem; }
+  .cbtn {
+    width:44px; height:44px; border-radius:50%; border:1px solid var(--line);
+    background:var(--panel2); color:var(--text); font-size:1rem; cursor:pointer;
+  }
+  .cbtn:hover { border-color:var(--cyan); }
+  .cbtn.main { width:56px; height:56px; font-size:1.25rem;
+    background:linear-gradient(135deg,var(--magenta),var(--gold)); color:#12060f; border:none; }
+  .controls .hint { margin-left:auto; color:var(--dim); font-size:.78rem; }
+
+  .playlist { margin-top:1.1rem; }
+  .track {
+    display:flex; align-items:center; gap:.9rem; padding:.65rem .9rem;
+    border:1px solid transparent; border-radius:10px; cursor:pointer;
+  }
+  .track:hover { background:var(--panel); }
+  .track.current { background:var(--panel); border-color:var(--line); }
+  .track .idx { color:var(--dim); font-size:.8rem; width:1.4em; text-align:right; }
+  .track .t { font-weight:600; }
+  .track .n { color:var(--dim); font-size:.82rem; }
+  .track .dur { margin-left:auto; color:var(--dim); font-size:.82rem; }
+  /* mini equalizer for the playing row */
+  .eq { display:none; gap:2px; align-items:flex-end; height:14px; width:16px; }
+  .track.playing .eq { display:flex; }
+  .track.playing .idx { display:none; }
+  .eq i { width:3px; background:var(--green); animation:eq .9s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay:.25s; height:100%; }
+  .eq i:nth-child(3) { animation-delay:.5s; }
+  .eq i { height:60%; }
+  .track.paused .eq i { animation-play-state:paused; }
+  @keyframes eq { 0%,100% { transform:scaleY(.3);} 50% { transform:scaleY(1);} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="../assets/logo.png" alt="">
+    <h1>COZY_TRACKER <small>· listen</small></h1>
+    <nav><a href="../">home</a><a href="../player/">tracker</a><a href="https://github.com/c0ze/cozy-tracker">github</a></nav>
+  </header>
+
+  <div class="deck">
+    <canvas id="viz" title="click to cycle visualizer"></canvas>
+    <div class="vizbar">
+      <span style="color:var(--dim); font-size:.75rem; margin-right:.3rem;">viz</span>
+      <button class="vmode on" data-m="wave">~ wave</button>
+      <button class="vmode" data-m="bars">|| bars</button>
+      <button class="vmode" data-m="rings">◎ rings</button>
+    </div>
+    <div class="now">
+      <div id="nowTitle">pick a track</div>
+      <div id="nowTime" class="mono">--:-- / --:--</div>
+    </div>
+    <div class="controls">
+      <button class="cbtn" id="prev" title="previous">⏮</button>
+      <button class="cbtn main" id="play" title="play/pause">▶</button>
+      <button class="cbtn" id="stop" title="stop">■</button>
+      <button class="cbtn" id="next" title="next">⏭</button>
+      <span class="hint">space = play/pause · all tracks generated by the pipeline</span>
+    </div>
+  </div>
+
+  <div class="playlist" id="playlist"></div>
+</div>
+
+<script type="module">
+import { ChiptuneJsPlayer } from '../player/vendor/chiptune3/chiptune3.js';
+
+const TRACKS = [
+  { file: '../demos/night_bus.it', title: 'Night Bus', note: 'laid-back groove · lint-clean' },
+  { file: '../demos/paper_hearts.it', title: 'Paper Hearts', note: 'chip-pop · liquid harp, no drums' },
+  { file: '../demos/first_light.it', title: 'First Light', note: 'melodic · key-change climax' },
+  { file: '../demos/winter_orbit.it', title: 'Winter Orbit', note: 'sparse ambient · music-box bells' },
+  { file: '../demos/siege_engine.it', title: 'Siege Engine', note: 'aggressive driver · war drums' },
+  { file: '../demos/siege_to_night.it', title: 'Siege → Night Bus', note: 'two songs + a generated bridge, one file' },
+];
+
+const $ = (id) => document.getElementById(id);
+let player = null, analyser = null, timeData = null, freqData = null;
+let cur = -1;               // playlist index
+let state = 'stopped';      // stopped | playing | paused
+let dur = 0, pos = 0;
+
+// ---------- playlist ----------
+const listEl = $('playlist');
+TRACKS.forEach((t, i) => {
+  const row = document.createElement('div');
+  row.className = 'track';
+  row.innerHTML = `<span class="idx mono">${i + 1}</span>
+    <span class="eq"><i></i><i></i><i></i></span>
+    <span><div class="t">${t.title}</div><div class="n">${t.note}</div></span>
+    <span class="dur mono" id="dur${i}"></span>`;
+  row.addEventListener('click', () => playTrack(i));
+  listEl.appendChild(row);
+});
+function markRows() {
+  [...listEl.children].forEach((row, i) => {
+    row.classList.toggle('current', i === cur);
+    row.classList.toggle('playing', i === cur && state !== 'stopped');
+    row.classList.toggle('paused', i === cur && state === 'paused');
+  });
+}
+
+// ---------- player ----------
+const fmt = (s) => (isNaN(s) || s === undefined) ? '--:--' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+async function ensurePlayer() {
+  if (player) return;
+  player = new ChiptuneJsPlayer({ repeatCount: 0 }); // play once, then advance
+  window.__player = player; // debug handle
+  await new Promise((r) => player.onInitialized(r));
+  analyser = player.context.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.82;
+  timeData = new Float32Array(analyser.fftSize);
+  freqData = new Uint8Array(analyser.frequencyBinCount);
+  player.gain.connect(analyser);
+  player.onMetadata((m) => {
+    dur = m.dur;
+    if (cur >= 0) $('dur' + cur).textContent = fmt(m.dur);
+    updateNow();
+  });
+  player.onProgress((d) => { pos = d.pos; updateNow(); });
+  // the worklet posts 'end' on every process tick once a module finishes —
+  // guard with a dead zone so the burst can't skip tracks while the next
+  // one is still fetching
+  player.onEnded(() => {
+    if (state !== 'playing' || Date.now() - lastStart < 1500) return;
+    playTrack((cur + 1) % TRACKS.length);
+  });
+}
+
+let lastStart = 0;
+async function playTrack(i) {
+  await ensurePlayer();
+  if (player.context.state === 'suspended') await player.context.resume();
+  cur = i;
+  lastStart = Date.now();
+  pos = 0; dur = 0;
+  const buf = await (await fetch(TRACKS[i].file)).arrayBuffer();
+  player.play(buf);
+  state = 'playing';
+  $('play').textContent = '⏸';
+  $('nowTitle').textContent = TRACKS[i].title;
+  markRows();
+}
+
+function togglePlay() {
+  if (state === 'stopped') { playTrack(cur < 0 ? 0 : cur); return; }
+  if (state === 'playing') { player.pause(); state = 'paused'; $('play').textContent = '▶'; }
+  else { player.unpause(); state = 'playing'; $('play').textContent = '⏸'; }
+  markRows();
+}
+function stopAll() {
+  if (player) player.stop();
+  state = 'stopped'; pos = 0;
+  $('play').textContent = '▶';
+  updateNow(); markRows();
+}
+function updateNow() {
+  $('nowTime').textContent = `${fmt(state === 'stopped' ? NaN : pos)} / ${fmt(dur || NaN)}`;
+}
+
+$('play').addEventListener('click', togglePlay);
+$('stop').addEventListener('click', stopAll);
+$('next').addEventListener('click', () => playTrack(((cur < 0 ? -1 : cur) + 1) % TRACKS.length));
+$('prev').addEventListener('click', () => playTrack(((cur < 0 ? 1 : cur) - 1 + TRACKS.length) % TRACKS.length));
+addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && !/input|button|select/i.test(e.target.tagName)) { e.preventDefault(); togglePlay(); }
+});
+
+// ---------- visualizers ----------
+const viz = $('viz');
+const MODES = ['wave', 'bars', 'rings'];
+let mode = 'wave';
+let ringPhase = 0;
+const barPeaks = [];
+
+document.querySelectorAll('.vmode').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.m)));
+viz.addEventListener('click', () => setMode(MODES[(MODES.indexOf(mode) + 1) % MODES.length]));
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.vmode').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+}
+
+function fit(c) {
+  const r = c.getBoundingClientRect();
+  const dpr = devicePixelRatio || 1;
+  if (c.width !== Math.round(r.width * dpr)) { c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); }
+  return { w: r.width, h: r.height, dpr };
+}
+const grad3 = (ctx, w) => {
+  const g = ctx.createLinearGradient(0, 0, w, 0);
+  g.addColorStop(0, '#4fc1ff'); g.addColorStop(.5, '#ff5ac0'); g.addColorStop(1, '#e0a458');
+  return g;
+};
+
+function draw() {
+  requestAnimationFrame(draw);
+  const { w, h, dpr } = fit(viz);
+  const ctx = viz.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const live = state === 'playing' && analyser;
+
+  if (mode === 'bars') ctx.clearRect(0, 0, w, h);
+  else { ctx.fillStyle = 'rgba(10,12,16,.28)'; ctx.fillRect(0, 0, w, h); } // motion trails
+
+  if (live) {
+    analyser.getFloatTimeDomainData(timeData);
+    analyser.getByteFrequencyData(freqData);
+  } else {
+    timeData && timeData.fill(0);
+    freqData && freqData.fill(0);
+  }
+
+  if (mode === 'wave') {
+    // dancing wave: glowing oscilloscope line
+    ctx.strokeStyle = grad3(ctx, w);
+    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(79,193,255,.6)';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    const n = timeData ? timeData.length : 2;
+    for (let x = 0; x <= w; x += 2) {
+      const v = timeData ? timeData[Math.floor(x / w * (n - 1))] : 0;
+      const y = h / 2 - v * h * 0.42;
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  } else if (mode === 'bars') {
+    // eq bars with falling peak caps
+    const N = 48;
+    const bw = w / N;
+    const bins = freqData ? Math.floor(freqData.length * 0.72) : N;
+    for (let i = 0; i < N; i++) {
+      let v = 0;
+      if (freqData) {
+        const a = Math.floor(i / N * bins), b = Math.floor((i + 1) / N * bins);
+        for (let j = a; j < Math.max(b, a + 1); j++) v = Math.max(v, freqData[j]);
+        v /= 255;
+      }
+      const bh = v * (h - 18);
+      const hue = 190 + (i / N) * 130; // cyan → magenta
+      ctx.fillStyle = `hsla(${hue}, 80%, 60%, .9)`;
+      ctx.fillRect(i * bw + 1, h - bh, bw - 2, bh);
+      barPeaks[i] = Math.max(bh, (barPeaks[i] || 0) - 1.6); // gravity
+      ctx.fillStyle = 'rgba(230,233,239,.85)';
+      ctx.fillRect(i * bw + 1, h - barPeaks[i] - 3, bw - 2, 2);
+    }
+  } else {
+    // rings: radial scope around a bass-pulsing core
+    ringPhase += 0.0035;
+    const cx = w / 2, cy = h / 2;
+    let bass = 0;
+    if (freqData) { for (let i = 0; i < 24; i++) bass += freqData[i]; bass /= 24 * 255; }
+    const R = Math.min(w, h) * 0.28 + bass * 14;
+    // core glow
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * (0.55 + bass * 0.5));
+    glow.addColorStop(0, `rgba(224,164,88,${0.25 + bass * 0.55})`);
+    glow.addColorStop(1, 'rgba(224,164,88,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
+    // waveform ring
+    ctx.strokeStyle = grad3(ctx, w);
+    ctx.lineWidth = 1.8;
+    ctx.shadowColor = 'rgba(255,90,192,.55)';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    const STEPS = 256;
+    const n = timeData ? timeData.length : 2;
+    for (let i = 0; i <= STEPS; i++) {
+      const th = (i / STEPS) * Math.PI * 2 + ringPhase;
+      const v = timeData ? timeData[Math.floor(i / STEPS * (n - 1))] : 0;
+      const rr = R + v * h * 0.3;
+      const x = cx + Math.cos(th) * rr, y = cy + Math.sin(th) * rr;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+}
+draw();
+</script>
+</body>
+</html>
