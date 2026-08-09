@@ -1,6 +1,7 @@
 node_modules/
 build/
 .DS_Store
+.claude/
 
 # bulk assets stay out of git — see library/README.md
 library/*
