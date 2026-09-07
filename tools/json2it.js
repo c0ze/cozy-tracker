@@ -22,6 +22,7 @@ import { fileURLToPath } from "url";
 import itwriter from "../vendor/itwriter/index.js";
 import { synthesize } from "./synth.js";
 import { readWav } from "./wav.js";
+import { assertSong } from "./validate-song.js";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const MIDDLE_C = 261.6256;
@@ -68,7 +69,9 @@ if (!inFile) {
 }
 
 const song = JSON.parse(fs.readFileSync(inFile, "utf8"));
+assertSong(song);
 song.samples = (song.samples || []).map(resolveSample);
+assertSong(song);
 
 const outFile = outFileArg || path.join(ROOT, "build", path.basename(inFile).replace(/\.json$/, ".it"));
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
@@ -89,7 +92,7 @@ if (song.adaptive) {
     if (s > e || e >= song.order.length) console.warn(`manifest: section "${name}" [${s},${e}] outside order list (length ${song.order.length})`);
   }
   if (a.loop && !(a.sections || {})[a.loop]) console.warn(`manifest: loop section "${a.loop}" not defined`);
-  const mFile = outFile.replace(/\.it$/, ".cozy.json");
+  const mFile = /\.it$/i.test(outFile) ? outFile.replace(/\.it$/i, ".cozy.json") : `${outFile}.cozy.json`;
   fs.writeFileSync(mFile, JSON.stringify(a, null, 1));
   console.log(`${mFile} (adaptive manifest: ${(a.layers || []).length} layers, ${Object.keys(a.sections || {}).length} sections)`);
 }

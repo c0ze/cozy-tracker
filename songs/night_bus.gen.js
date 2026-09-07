@@ -7,14 +7,14 @@
  * Rules applied:
  * - budget 4 elements: bass, ONE chord gesture, drums, hat. The lead only
  *   ever REPLACES the chords (swap, don't stack)
- * - every sustained note has a written death: chords are re-struck or ==,
- *   lead notes end with == within a few rows; bass is a self-decaying pluck
+ * - every sustained note has a written death: chords are re-struck or ^^,
+ *   lead notes end with ^^ within a few rows; bass is a self-decaying pluck
  * - register bands with buffer octaves: bass oct 2, chords oct 5 (spread by
  *   pan, not pitch), lead oct 6; percussion in between
  * - two chords only (Am7 -> Fmaj7, i -> bVI), 3+1 bars; melody uses chord
  *   tones + pentatonic so nothing fights the harmony
  * - repeats are verbatim (groove); variation = one added stab or a fill
- * - acceptance: tools/lint.js must be clean
+ * - verification: lint, render, then audition sustained texture and loop seams
  *
  * A minor, 112 BPM, speed 6 (16 rows/bar, 64-row patterns, ~8.6s each).
  */
@@ -58,7 +58,7 @@ function bass() {
   return ch;
 }
 // --- ONE chord gesture: 3 notes in the oct-5 band, spread by pan ------------
-// struck twice a bar, ends written: re-strike or == before the bar turns
+// struck twice a bar, ends written: re-strike or ^^ before the bar turns
 const VOICING = { A: [["C-5", "p10"], ["E-5", "p20"], ["G-5", "p30"]], F: [["C-5", "p10"], ["E-5", "p20"], ["A-5", "p30"]] };
 function chords({ turnStab = false } = {}) {
   const chs = [{}, {}, {}];
@@ -68,11 +68,11 @@ function chords({ turnStab = false } = {}) {
       put(chs[i], o, { note: n, instrument: I.keys, vol: "v30" });
       put(chs[i], o + 1, { vol: pan });
       put(chs[i], o + 8, { note: n, instrument: I.keys, vol: "v24" });
-      put(chs[i], o + 14, { note: "==" });
+      put(chs[i], o + 14, { note: "^^" });
     });
     if (turnStab && bar === 3) VOICING.F.forEach(([n], i) => {
       put(chs[i], o + 12, { note: n, instrument: I.keys, vol: "v20" });
-      // == at o+14 above still closes it
+      // ^^ at o+14 above still closes it
     });
   });
   return chs;
@@ -80,19 +80,19 @@ function chords({ turnStab = false } = {}) {
 // --- lead (replaces chords): short phrases, every note dies within 4 rows ---
 // oct 6, A-minor pentatonic + chord tones
 const LEAD = [
-  [0, "E-6", 36], [3, "=="], [4, "G-6", 34], [6, "=="], [8, "A-6", 38], [12, "=="],
-  [20, "G-6", 34], [23, "=="], [24, "E-6", 36], [28, "=="],
-  [32, "C-6", 34], [35, "=="], [36, "D-6", 34], [39, "=="], [40, "E-6", 38], [44, "=="],
-  [48, "A-5", 36], [52, "=="], [54, "C-6", 32], [57, "=="], [58, "E-6", 30], [61, "=="],
+  [0, "E-6", 36], [3, "^^"], [4, "G-6", 34], [6, "^^"], [8, "A-6", 38], [12, "^^"],
+  [20, "G-6", 34], [23, "^^"], [24, "E-6", 36], [28, "^^"],
+  [32, "C-6", 34], [35, "^^"], [36, "D-6", 34], [39, "^^"], [40, "E-6", 38], [44, "^^"],
+  [48, "A-5", 36], [52, "^^"], [54, "C-6", 32], [57, "^^"], [58, "E-6", 30], [61, "^^"],
 ];
 const LEAD_B = [
-  [0, "A-6", 36], [4, "=="], [6, "G-6", 32], [9, "=="], [12, "E-6", 34], [16, "=="],
-  [24, "D-6", 34], [27, "=="], [28, "C-6", 32], [31, "=="],
-  [32, "E-6", 36], [36, "=="], [40, "G-6", 34], [43, "=="], [44, "A-6", 36], [48, "=="],
-  [52, "E-6", 32], [55, "=="], [56, "C-6", 30], [60, "=="],
+  [0, "A-6", 36], [4, "^^"], [6, "G-6", 32], [9, "^^"], [12, "E-6", 34], [16, "^^"],
+  [24, "D-6", 34], [27, "^^"], [28, "C-6", 32], [31, "^^"],
+  [32, "E-6", 36], [36, "^^"], [40, "G-6", 34], [43, "^^"], [44, "A-6", 36], [48, "^^"],
+  [52, "E-6", 32], [55, "^^"], [56, "C-6", 30], [60, "^^"],
 ];
 // written echo: same line 1 row later (as in the corpus), quiet, own ends —
-// 1-row delay means the echo's == lands before/with the lead's next note
+// 1-row delay means the echo's ^^ lands before/with the lead's next note
 const echoOf = (events) => mel(events.map(([r, n, v]) => [r + 1, n, v ? Math.round(v * 0.45) : v]), { inst: I.flute });
 
 // --- patterns ----------------------------------------------------------------
@@ -125,7 +125,7 @@ VOICING.A.forEach(([n, pan], i) => {
   put(outroChord[i], 0, { note: n, instrument: I.keys, vol: "v26" });
   put(outroChord[i], 1, { vol: pan });
   for (let r = 8; r <= 24; r += 8) put(outroChord[i], r, { fx: "D01" });
-  put(outroChord[i], 30, { note: "==" });
+  put(outroChord[i], 30, { note: "^^" });
 });
 const outroBass = {};
 put(outroBass, 0, { note: "A-2", instrument: I.bass, vol: "v48" });
@@ -136,7 +136,7 @@ const P5 = P([{ 0: { note: "C-5", instrument: I.kick, vol: "v50" } }, outroHats,
 // --- assemble ------------------------------------------------------------------
 writeSong(import.meta.url, {
   title: "Night Bus",
-  message: "Night Bus\n\nLaid-back groove. Composed under restraint rules:\nmax 4 elements, swap don't stack, every note's end written,\none chord gesture, register bands. Lint-clean.\nSource: songs/night_bus.gen.js",
+  message: "Night Bus\n\nLaid-back groove. Composed under restraint rules:\nmax 4 elements, swap don't stack, every note's end written,\none chord gesture, register bands. Written cuts in sample mode.\nSource: songs/night_bus.gen.js",
   bpm: 112,
   ticks: 6,
   mixvol: 64,

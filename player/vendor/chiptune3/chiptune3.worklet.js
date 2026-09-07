@@ -202,7 +202,12 @@ class MPT extends AudioWorkletProcessor {
 		const ptrToFile = libopenmpt._malloc(byteArray.byteLength)
 		libopenmpt.HEAPU8.set(byteArray, ptrToFile)
 		// ext module so we can reach the interactive interface (channel mute etc.)
-		this.extPtr = libopenmpt._openmpt_module_ext_create_from_memory(ptrToFile, byteArray.byteLength, 0, 0, 0, 0, 0, 0, 0)
+		try {
+			this.extPtr = libopenmpt._openmpt_module_ext_create_from_memory(ptrToFile, byteArray.byteLength, 0, 0, 0, 0, 0, 0, 0)
+		} finally {
+			// libopenmpt owns its decoded module; the input copy is temporary.
+			libopenmpt._free(ptrToFile)
+		}
 		this.modulePtr = this.extPtr ? libopenmpt._openmpt_module_ext_get_module(this.extPtr) : 0
 
 		if(this.modulePtr === 0) {
@@ -246,23 +251,23 @@ class MPT extends AudioWorkletProcessor {
 		if (!paused) this.meta()
 	}
 	stop() {
-		if (!this.modulePtr) return
 		if (this.extPtr) {
 			libopenmpt._openmpt_module_ext_destroy(this.extPtr)
 			this.extPtr = 0
 			this.modulePtr = 0
-		} else if (this.modulePtr != 0) {
+		} else if (this.modulePtr) {
 			libopenmpt._openmpt_module_destroy(this.modulePtr)
 			this.modulePtr = 0
 		}
-		if (this.leftBufferPtr != 0) {
-			libopenmpt._free(this.leftBufferPtr)
-			this.leftBufferPtr = 0
+		if (this.leftPtr) {
+			libopenmpt._free(this.leftPtr)
+			this.leftPtr = 0
 		}
-		if (this.rightBufferPtr != 0) {
-			libopenmpt._free(this.rightBufferPtr)
-			this.rightBufferPtr = 0
+		if (this.rightPtr) {
+			libopenmpt._free(this.rightPtr)
+			this.rightPtr = 0
 		}
+		this.setChannelMuteFn = null
 		this.channels = 0
 	}
 	meta() {

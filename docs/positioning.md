@@ -31,9 +31,9 @@ Tracker modules give you two superpowers for free, and cozy generates music
 built to use them:
 - *Vertical layering* — every instrument lives on its own channel, so intensity
   is just muting and unmuting layers. Exploration keeps pad and bass; combat
-  brings in drums and lead. Instant, sample-accurate, one file.
+  brings in drums and lead. Engine-level channel muting, one file.
 - *Horizontal re-sequencing* — named sections with clean musical jump points.
-  Walk from exploration into a boss theme at the next bar, seamlessly.
+  Walk from exploration into a boss theme at an observed pattern boundary (timing currently approximate).
 - Real-time tempo and pitch, with no artifacts.
 
 **2. Generated, not hand-drawn.**
@@ -82,7 +82,7 @@ Alongside every module, cozy emits a manifest describing its layers and sections
 ```js
 const music = new CozyAdaptive('level1.it', 'level1.cozy.json');
 music.setIntensity(0.7);      // mutes layers above the threshold
-music.transitionTo('combat'); // jumps at the next bar
+music.transitionTo('combat'); // requests the next pattern boundary
 ```
 
 **Godot**

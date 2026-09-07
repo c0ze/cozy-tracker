@@ -55,13 +55,13 @@ const merged = mergeSongs(siege, night, {
     // war-horn drone: one last long breath, fading, ended
     p1[cDrone][0] = { note: "E-4", instrument: iDrone, vol: "v30" };
     for (const r of [8, 16, 24, 32, 40]) p1[cDrone][r] = { fx: "D01" };
-    p1[cDrone][48] = { note: "==" };
+    p1[cDrone][48] = { note: "^^" };
     // siege bass pulse thinning out (looped square — every hit choked/ended)
     [[0, "E-2", 40], [8, "E-2", 32], [16, "E-3", 26], [24, "E-2", 20], [32, "E-2", 14]].forEach(([r, n, v]) => {
       p1[cBassA][r] = { note: n, instrument: iBassA, vol: `v${v}` };
       p1[cBassA][r + 2] = { vol: "v08" };
     });
-    p1[cBassA][36] = { note: "==" };
+    p1[cBassA][36] = { note: "^^" };
     // sparse kick heartbeat, fading (one-shots)
     [[0, 50], [16, 36], [32, 24]].forEach(([r, v]) => { p1[cKick][r] = { note: "C-5", instrument: iKick, vol: `v${v}` }; });
     // timbral handoff: night's pluck takes the E pedal (self-decaying)
@@ -83,13 +83,13 @@ const merged = mergeSongs(siege, night, {
     p2[cDrone][0] = { note: "E-4", instrument: iDrone, vol: "v16" };
     p2[cDrone][4] = { fx: "D01" };
     p2[cDrone][8] = { fx: "D01" };
-    p2[cDrone][14] = { note: "==" };
+    p2[cDrone][14] = { note: "^^" };
     // one warm Am7 swell at the resolution, with its written death
     [["C-5", 0], ["E-5", 1], ["G-5", 2]].forEach(([n, i]) => {
       p2[cK[i]][32] = { note: n, instrument: iKeys, vol: "v24" };
       p2[cK[i]][33] = { vol: `p${16 + i * 16}` };
       p2[cK[i]][44] = { fx: "D01" };
-      p2[cK[i]][46] = { note: "==" };
+      p2[cK[i]][46] = { note: "^^" };
     });
     // offbeat hats fade in with the groove (one-shots)
     for (let r = 34; r < 64; r += 4) p2[cHat][r] = { note: "C-5", instrument: iHat, vol: `v${r < 48 ? 18 : 26}` };

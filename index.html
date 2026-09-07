@@ -115,7 +115,7 @@
     <h2><span class="k">What makes it different</span>Not a music player. A music <em>system</em>.</h2>
     <div class="grid">
       <div class="card"><div class="ic">🎚️</div><h3>Adaptive by construction</h3>
-        <p>Each instrument is its own channel. Intensity is just muting layers; transitions are jumps between named sections — sample-accurate, one file, zero crossfades.</p></div>
+        <p>Each instrument is its own channel. Intensity is just muting layers; transitions are jumps between named sections — one file, with transitions scheduled at pattern boundaries.</p></div>
       <div class="card"><div class="ic">✨</div><h3>Generated, not hand-drawn</h3>
         <p>Describe it, get it. Batch a whole soundtrack in CI. Spin twelve variations for procedural levels from a seed.</p></div>
       <div class="card"><div class="ic">🌉</div><h3>LLM transitions</h3>
@@ -214,7 +214,8 @@
       to a self-contained module. Open one in the browser player — pattern view, per-channel
       solo/mute, oscilloscope.</p>
     <div class="demos">
-      <div class="demo"><div class="meta">Night Bus<small>laid-back groove · lint-clean</small></div><a class="btn" href="player/?song=../demos/night_bus.it">▶</a></div>
+      <div class="demo"><div class="meta">Lantern Walk<small>gentle chip · new composition study</small></div><a class="btn" href="player/?song=../demos/lantern_walk.it">▶</a></div>
+      <div class="demo"><div class="meta">Night Bus<small>laid-back groove · chords and flute</small></div><a class="btn" href="player/?song=../demos/night_bus.it">▶</a></div>
       <div class="demo"><div class="meta">First Light<small>melodic · key-change climax</small></div><a class="btn" href="player/?song=../demos/first_light.it">▶</a></div>
       <div class="demo"><div class="meta">Siege Engine<small>aggressive driver</small></div><a class="btn" href="player/?song=../demos/siege_engine.it">▶</a></div>
       <div class="demo"><div class="meta">Winter Orbit<small>sparse ambient</small></div><a class="btn" href="player/?song=../demos/winter_orbit.it">▶</a></div>
@@ -237,17 +238,16 @@
   // engine snippet tabs
   const SNIPPETS = {
     web:
-`<span class="kw">const</span> music = <span class="kw">new</span> <span class="fn">CozyAdaptive</span>(<span class="str">'level1.it'</span>, <span class="str">'level1.cozy.json'</span>);
+`<span class="kw">const</span> music = <span class="kw">await</span> CozyAdaptive.<span class="fn">create</span>(<span class="str">'level1.it'</span>, <span class="str">'level1.cozy.json'</span>);
 music.<span class="fn">setIntensity</span>(0.7);      <span class="cmt">// mutes layers above the threshold</span>
-music.<span class="fn">transitionTo</span>(<span class="str">'combat'</span>); <span class="cmt">// jumps at the next bar</span>`,
+music.<span class="fn">transitionTo</span>(<span class="str">'combat'</span>); <span class="cmt">// request at the next pattern boundary</span>`,
     godot:
-`<span class="kw">var</span> music = CozyAdaptive.<span class="fn">load</span>(<span class="str">"res://music/level1.it"</span>)
+`<span class="kw">var</span> music = CozyAdaptive.<span class="fn">create</span>(self, <span class="str">"res://music/level1.it"</span>, <span class="str">"res://music/level1.cozy.json"</span>)
 music.<span class="fn">set_intensity</span>(0.7)
 music.<span class="fn">transition_to</span>(<span class="str">"combat"</span>)`,
     unity:
-`<span class="kw">var</span> music = CozyAdaptive.<span class="fn">Load</span>(<span class="str">"level1.it"</span>);
-music.<span class="fn">SetIntensity</span>(0.7f);
-music.<span class="fn">TransitionTo</span>(<span class="str">"combat"</span>);`,
+`<span class="cmt">// Unity wrapper is planned; not implemented yet.
+// Use libopenmpt integration in your project.</span>`,
   };
   const snip = document.getElementById('snippet');
   const setSnip = (t) => { snip.innerHTML = SNIPPETS[t]; };

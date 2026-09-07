@@ -10,11 +10,12 @@
 import { ChiptuneJsPlayer } from '../player/vendor/chiptune3/chiptune3.js';
 
 const TRACKS = [
-  { file: 'night_bus.it', title: 'Night Bus', note: 'laid-back groove · lint-clean' },
+  { file: 'night_bus.it', title: 'Night Bus', note: 'laid-back groove · chords and flute' },
   { file: 'paper_hearts.it', title: 'Paper Hearts', note: 'chip-pop · liquid harp, no drums' },
   { file: 'first_light.it', title: 'First Light', note: 'melodic · key-change climax' },
   { file: 'winter_orbit.it', title: 'Winter Orbit', note: 'sparse ambient · music-box bells' },
   { file: 'siege_engine.it', title: 'Siege Engine', note: 'aggressive driver · war drums' },
+  { file: 'lantern_walk.it', title: 'Lantern Walk', note: 'gentle chip · four-voice melodic study' },
   { file: 'siege_to_night.it', title: 'Siege → Night Bus', note: 'two songs + a generated bridge, one file' },
 ];
 
@@ -106,6 +107,7 @@ export function mountJukebox(container, opts = {}) {
   });
 
   let player = null, analyser = null, timeData = null, freqData = null;
+  let playerReady = null, generation = 0, disposed = false, frame = null;
   let cur = -1, state = 'stopped', dur = 0, pos = 0, lastStart = 0;
 
   const fmt = (s) => (isNaN(s) || s === undefined) ? '--:--' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -113,74 +115,115 @@ export function mountJukebox(container, opts = {}) {
   const markRows = () => {
     [...rows.children].forEach((row, i) => {
       row.classList.toggle('current', i === cur);
-      row.classList.toggle('playing', i === cur && state !== 'stopped');
+      row.classList.toggle('playing', i === cur && (state === 'playing' || state === 'paused'));
       row.classList.toggle('paused', i === cur && state === 'paused');
     });
   };
 
   async function ensurePlayer() {
-    if (player) return;
+    if (playerReady) return playerReady;
     // AudioWorklet requires a secure context — plain http gets a clear hint
     if (!window.isSecureContext || !('audioWorklet' in (window.AudioContext?.prototype ?? {}))) {
       q('.jb-title').innerHTML = `⚠ audio needs HTTPS — try <a href="https://${location.host}${location.pathname}">https://${location.host}</a>`;
       throw new Error('secure context required for AudioWorklet');
     }
     player = new ChiptuneJsPlayer({ repeatCount: 0 });
-    await new Promise((r) => player.onInitialized(r));
-    analyser = player.context.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.82;
-    timeData = new Float32Array(analyser.fftSize);
-    freqData = new Uint8Array(analyser.frequencyBinCount);
-    player.gain.connect(analyser);
-    player.onMetadata((m) => {
-      dur = m.dur;
-      if (cur >= 0) rows.children[cur].querySelector('.dur').textContent = fmt(m.dur);
-      updateNow();
+    playerReady = new Promise((r) => player.onInitialized(r)).then(() => {
+      if (disposed) return;
+      analyser = player.context.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.82;
+      timeData = new Float32Array(analyser.fftSize);
+      freqData = new Uint8Array(analyser.frequencyBinCount);
+      player.gain.connect(analyser);
+      player.onMetadata((m) => {
+        if (disposed || state !== 'playing') return;
+        dur = m.dur;
+        if (cur >= 0) rows.children[cur].querySelector('.dur').textContent = fmt(m.dur);
+        updateNow();
+      });
+      player.onProgress((d) => { if (!disposed && state === 'playing') { pos = d.pos; updateNow(); } });
+      // Worklet end messages can repeat; loading state suppresses duplicate advances.
+      player.onEnded(() => {
+        if (disposed || state !== 'playing' || Date.now() - lastStart < 1500) return;
+        playTrack((cur + 1) % TRACKS.length);
+      });
     });
-    player.onProgress((d) => { pos = d.pos; updateNow(); });
-    // worklet spams 'end' every tick once finished — dead-zone guard prevents skips
-    player.onEnded(() => {
-      if (state !== 'playing' || Date.now() - lastStart < 1500) return;
-      playTrack((cur + 1) % TRACKS.length);
-    });
+    return playerReady;
   }
 
   async function playTrack(i) {
-    try { await ensurePlayer(); } catch { return; } // message already shown
-    if (player.context.state === 'suspended') await player.context.resume();
+    if (disposed) return;
+    if (!Number.isInteger(i) || !TRACKS[i]) throw new RangeError('unknown track index');
+    const request = ++generation;
+    const current = () => !disposed && request === generation;
     cur = i;
-    lastStart = Date.now();
+    state = 'loading';
     pos = 0; dur = 0;
-    const buf = await (await fetch(base + TRACKS[i].file)).arrayBuffer();
-    player.play(buf);
-    state = 'playing';
-    q('.jb-play').textContent = '⏸';
-    q('.jb-title').textContent = TRACKS[i].title;
-    markRows();
+    q('.jb-play').textContent = '…';
+    q('.jb-title').textContent = `loading ${TRACKS[i].title}…`;
+    updateNow(); markRows();
+    try {
+      await ensurePlayer();
+      if (!current()) return;
+      player.stop();
+      if (player.context.state === 'suspended') await player.context.resume();
+      if (!current()) return;
+      const response = await fetch(base + TRACKS[i].file);
+      if (!current()) return;
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const buf = await response.arrayBuffer();
+      if (!current()) return;
+      lastStart = Date.now();
+      state = 'playing';
+      player.play(buf);
+      q('.jb-play').textContent = '⏸';
+      q('.jb-title').textContent = TRACKS[i].title;
+      markRows();
+    } catch (error) {
+      if (!current()) return;
+      state = 'stopped';
+      q('.jb-play').textContent = '▶';
+      q('.jb-title').textContent = `could not load ${TRACKS[i].title}: ${error.message}`;
+      updateNow(); markRows();
+    }
   }
   function togglePlay() {
+    if (disposed) return;
+    if (state === 'loading') { stopAll(); return; }
     if (state === 'stopped') { playTrack(cur < 0 ? 0 : cur); return; }
     if (state === 'playing') { player.pause(); state = 'paused'; q('.jb-play').textContent = '▶'; }
     else { player.unpause(); state = 'playing'; q('.jb-play').textContent = '⏸'; }
     markRows();
   }
   function stopAll() {
+    generation++; // pending initialization/download/decode can no longer start audio
     if (player) player.stop();
     state = 'stopped'; pos = 0;
     q('.jb-play').textContent = '▶';
     updateNow(); markRows();
   }
 
+  async function dispose() {
+    if (disposed) return;
+    disposed = true;
+    stopAll();
+    if (frame !== null) cancelAnimationFrame(frame);
+    if (opts.keyboard) removeEventListener('keydown', onKeydown);
+    analyser?.disconnect();
+    player?.processNode?.disconnect();
+    player?.gain.disconnect();
+    if (player && player.context.state !== 'closed') await player.context.close();
+  }
+
   q('.jb-play').addEventListener('click', togglePlay);
   q('.jb-stop').addEventListener('click', stopAll);
   q('.jb-next').addEventListener('click', () => playTrack(((cur < 0 ? -1 : cur) + 1) % TRACKS.length));
   q('.jb-prev').addEventListener('click', () => playTrack(((cur < 0 ? 1 : cur) - 1 + TRACKS.length) % TRACKS.length));
-  if (opts.keyboard) {
-    addEventListener('keydown', (e) => {
-      if (e.code === 'Space' && !/input|button|select|textarea/i.test(e.target.tagName)) { e.preventDefault(); togglePlay(); }
-    });
-  }
+  const onKeydown = (e) => {
+    if (e.code === 'Space' && !/input|button|select|textarea/i.test(e.target.tagName)) { e.preventDefault(); togglePlay(); }
+  };
+  if (opts.keyboard) addEventListener('keydown', onKeydown);
 
   // ---------- visualizers ----------
   const viz = q('.jb-viz');
@@ -209,7 +252,8 @@ export function mountJukebox(container, opts = {}) {
   };
 
   function draw() {
-    requestAnimationFrame(draw);
+    if (disposed) return;
+    frame = requestAnimationFrame(draw);
     const { w, h, dpr } = fit(viz);
     const ctx = viz.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -285,5 +329,5 @@ export function mountJukebox(container, opts = {}) {
   }
   draw();
 
-  return { playTrack, togglePlay, stopAll, get state() { return state; } };
+  return { playTrack, togglePlay, stopAll, dispose, get state() { return state; } };
 }

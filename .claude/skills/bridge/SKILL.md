@@ -11,6 +11,9 @@ between them musically. Reference implementation: `songs/siege_to_night.gen.js`.
 
 ## Prerequisites
 
+Read [the composition skill](../../../skills/mod-music/SKILL.md), including its
+clock and sample-mode note-ending reference.
+
 Both songs must have an `adaptive` block (layers + sections + loop) in their
 gen files — add one first if missing (see the mod-music skill).
 
@@ -34,21 +37,22 @@ gen files — add one first if missing (see the mod-music skill).
 4. **Compose the bridge** in `songs/<a>_to_<b>.gen.js` using
    `mergeSongs(a, b, { bridge: (ctx) => ... })` from `tools/merge.js`:
    - Pattern 1 "dissolve": strip A to 2-3 fading elements (drone/bass/sparse
-     percussion), all with written ends. Hand the pivot pitch from an A
+     percussion), all with written volume shapes and `^^` cuts (ordinary sample loops keep
+     ringing after `==`). Hand the pivot pitch from an A
      instrument to a B instrument near the end (timbral handoff).
    - Pattern 2 "arrival": resolve to B's key at a clear moment (~row 32),
      introduce B's bass groove + ONE chord gesture + B's hats fading in.
-   - RESTRAINT RULES apply (see mod-music skill): ≤4 elements, every
-     sustain's death written, register bands.
+   - Keep a clear foreground and reduce competing motion during the handoff.
+     Use actual sounding registers and note durations, including delayed tails.
    - ctx helpers: `chA(i)/chB(i)` channel mapping, `iA(i)/iB(i)` instrument
      mapping, `ctrl` = [tempo, speed, gvol] control channels, `gvA/gvB`
      loudness stamps, `hex2`.
 
 5. **Verify** (all must pass before done):
    - `node songs/<a>_to_<b>.gen.js && node tools/json2it.js songs/<a>_to_<b>.json`
-   - `node tools/lint.js songs/<a>_to_<b>.json` — bridge patterns
-     (indices len(A.patterns) and +1) must contribute ZERO warnings
-     (A/B's pre-existing warnings pass through; filter with grep)
+   - `node tools/lint.js songs/<a>_to_<b>.json` — inspect bridge-order
+     warnings and partial-simulation notes, then verify those passages in the render;
+     lint does not prove harmony or perceptual quality
    - `node tools/render.js build/<a>_to_<b>.it --stats-only` — no clipping
    - grid-check the stamps: `node tools/analyze.js build/<a>_to_<b>.it
      --pattern <bridgeIdx>` — expect Txx ramp / Axx / Vxx in the control

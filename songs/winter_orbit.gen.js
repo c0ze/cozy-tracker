@@ -44,9 +44,9 @@ function bellTrio(chs, notes, { rows = 32, vol = 40 } = {}) {
 function bellBass(ch, roots, rows = 32) {
   roots.forEach((n, i) => {
     const r = i * 16;
-    if (r >= rows) return;
+    if (r + 8 >= rows) return;
     put(ch, r + 8, { note: n, instrument: I.bellLow, vol: "v34" });
-    put(ch, r + 9, { note: n, instrument: I.bellLow, vol: "v18" });
+    if (r + 9 < rows) put(ch, r + 9, { note: n, instrument: I.bellLow, vol: "v18" });
   });
 }
 // sighing pedal: a note that droops in pitch each time it sounds
@@ -100,7 +100,7 @@ const P2 = P(A, 32, "main A (bells)");
 
 // --- P3: exhale (4 rows of release tails) --------------------------------------
 const ex = blank();
-for (const c of [7, 8, 9, 10, 11]) put(ex[c], 0, { note: "==" });
+for (const c of [7, 8, 9, 10, 11]) put(ex[c], 0, { note: "^^" });
 const P3 = P(ex, 4, "exhale");
 
 // --- P4: main B (32 rows) — pads enter, full texture ---------------------------
@@ -130,7 +130,7 @@ const P5 = P(BR, 40, "bridge (C)");
 
 // --- P6: winddown (8 rows) ------------------------------------------------------
 const W = blank();
-for (const c of [4, 7, 8, 9]) put(W[c], 0, { note: "==" });
+for (const c of [4, 7, 8, 9]) put(W[c], 0, { note: "^^" });
 [["E-5", 1], ["B-5", 3], ["G-5", 5]].forEach(([n, r], i) => put(W[i % 3], r, { note: n, instrument: I.bell, vol: `v${26 - i * 6}` }));
 put(W[3], 6, { note: "E-3", instrument: I.bellLow, vol: "v16" });
 const P6 = P(W, 8, "winddown");

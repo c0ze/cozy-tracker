@@ -30,8 +30,10 @@ var player: AudioStreamPlayer
 
 var _playback  # AudioStreamPlaybackMPT
 var _queue: Array = []
+var _next_boundary: bool = false
 var _settling: String = ""
 var _last_order: int = -1
+var _last_row: int = -1
 
 
 static func create(parent: Node, module_path: String, manifest_path: String) -> CozyAdaptive:
@@ -89,6 +91,7 @@ func transition_to(section_name: String, via: String = "", now: bool = false) ->
 		_queue = [via, section_name]
 	else:
 		_queue = [section_name]
+	_next_boundary = true
 	if now or not player.playing:
 		_advance()
 
@@ -111,12 +114,15 @@ func _jump(section_name: String) -> void:
 	section = section_name
 	_settling = section_name
 	_last_order = -1  # force re-evaluation: the jump may target the order we're on
+	_last_row = -1
 	_playback.seek(int(_range_of(section_name)[0]), 0)
 	section_changed.emit(section_name)
 
 
 func _advance() -> void:
 	if not _queue.is_empty():
+		# A via section plays its complete range before the destination.
+		_next_boundary = false
 		_jump(_queue.pop_front())
 
 
@@ -124,17 +130,27 @@ func _process(_delta: float) -> void:
 	if _playback == null or not player.playing:
 		return
 	var order: int = _playback.get_current_order()
-	if order == _last_order:
-		return
+	var row: int = _playback.get_current_row()
+	var previous_order := _last_order
+	# Same-order row resets catch one-order module wraps. Adaptive sections
+	# use linear patterns; an SBx loop to row zero is indistinguishable here.
+	var row_wrapped := order == previous_order and row == 0 and _last_row > 0
+	var boundary := order != previous_order or row_wrapped
 	_last_order = order
+	_last_row = row
+	if not boundary:
+		return
 
 	var r := _range_of(section) if section != "" else [0, 1 << 30]
 	if _settling != "":
 		if order >= int(r[0]) and order <= int(r[1]):
 			_settling = ""
 		return
-	if order > int(r[1]) or order < int(r[0]):
-		# pattern boundary crossed out of the section: transition or loop
+	var section_ended := order > int(r[1]) or order < int(r[0]) or (previous_order == int(r[1]) and (order < previous_order or row_wrapped))
+	if not _queue.is_empty() and _next_boundary:
+		_advance()
+	elif section_ended:
+		# Finish the whole bridge, or loop with no pending request.
 		if not _queue.is_empty():
 			_advance()
 		else:

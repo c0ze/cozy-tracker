@@ -73,10 +73,16 @@ function pad(bars, { vol = 20, ghosts = true } = {}) {
 }
 // v-pulse on held chord-melody notes: alternate quiet/loud vol stamps
 function addPulse(ch, rows = ROWS) {
-  let active = false;
+  let active = false, arp = null;
   for (let r = 0; r < rows; r++) {
-    if (ch[r]) { active = !!ch[r].note && ch[r].note !== "==" && ch[r].note !== "^^"; continue; }
-    if (active && r % 2 === 0) put(ch, r, { vol: r % 4 === 0 ? "v34" : "v10" });
+    const ev = ch[r];
+    if (ev?.note) {
+      active = ev.note !== "==" && ev.note !== "^^";
+      arp = active && ev.fx?.startsWith("J") ? ev.fx : null;
+    }
+    if (!active) continue;
+    if (arp && !ch[r]?.fx) ch[r] = { ...ch[r], fx: arp };
+    if (r % 2 === 0 && !ch[r]?.vol) ch[r] = { ...ch[r], vol: r % 4 === 0 ? "v34" : "v10" };
   }
   return ch;
 }
@@ -86,16 +92,16 @@ const CHORUS = [ // bars: Dm Dm C Am
   [0, "D-6", 44, "J37"], [12, "A-5", 40, "J58"],
   [16, "F-6", 44, "J49"], [26, "A-5", 40, "J58"],
   [32, "E-6", 44, "J38"], [40, "G-5", 38, "J59"], [44, "C-6", 42, "J47"],
-  [48, "C-6", 44, "J49"], [56, "A-5", 42, "J37"], [62, "=="],
+  [48, "C-6", 44, "J49"], [56, "A-5", 42, "J37"], [62, "^^"],
 ];
 const VERSE = [ // bars: Dm C Dm Am — sparser, lower register
   [0, "F-5", 38, "J49"], [8, "E-5", 34], [12, "D-5", 36, "J37"],
   [16, "E-5", 38, "J38"], [28, "G-5", 34, "J59"],
   [32, "F-5", 38, "J49"], [40, "A-5", 36, "J58"], [44, "G-5", 32],
-  [48, "E-5", 38, "J58"], [56, "C-5", 34, "J49"], [62, "=="],
+  [48, "E-5", 38, "J58"], [56, "C-5", 34, "J49"], [62, "^^"],
 ];
 // theme = chorus re-orchestrated: portamento glides + vibrato, no arps
-const THEME = CHORUS.map(([r, n, v], i) => [r, n, v, i === 0 ? "H21" : (n === "==" ? undefined : "G18")]);
+const THEME = CHORUS.map(([r, n, v], i) => [r, n, v, i === 0 ? "H21" : (n === "^^" ? undefined : "G18")]);
 
 const CHORUS_BARS = ["Dm", "Dm", "C", "Am"];
 const VERSE_BARS = ["Dm", "C", "Dm", "Am"];
@@ -109,7 +115,7 @@ const introLead = {};
 ["D-4", "F-4", "A-4", "D-5", "F-5", "A-5", "D-6", "F-6"].forEach((n, i) => {
   put(introLead, 32 + i * 4, { note: n, instrument: I.lead, vol: `v${8 + i * 5}` });
 });
-put(introLead, 63, { note: "==" });
+put(introLead, 63, { note: "^^" });
 const P0 = P([{}, introLead, {}, harp(CHORUS_BARS), pad(CHORUS_BARS, { ghosts: false, vol: 14 }), {}], "intro");
 
 const P1 = P([bass({ fill: false }), addPulse(mel(CHORUS, { inst: I.lead, scale: 0.72 })), {},
@@ -118,7 +124,7 @@ const P2 = P([bass(), addPulse(mel(VERSE, { inst: I.lead })), echo(VERSE, { dela
   harp(VERSE_BARS), pad(VERSE_BARS), {}], "verse");
 
 // P3 build: staccato cascade + riser into the next section
-const buildLead = mel([[0, "D-5", 36, "J37"], [8, "==" ]], { inst: I.lead });
+const buildLead = mel([[0, "D-5", 36, "J37"], [8, "^^" ]], { inst: I.lead });
 ["D-5", "A-5", "D-6", "F-6", "A-6", "D-7"].forEach((n, i) => {
   put(buildLead, 40 + i * 2, { note: n, instrument: I.lead, vol: `v${28 + i * 4}`, fx: "SC2" });
 });
@@ -139,7 +145,7 @@ const P5 = P([bass(), addPulse(mel(CHORUS, { inst: I.lead })), echo(CHORUS, { de
   harp(CHORUS_BARS), pad(CHORUS_BARS), counter], "chorus");
 
 // P6 bridge: calm — long low notes, fading drone, heartbeat only
-const bridgeLead = mel([[0, "A-4", 34, "H21"], [16, "C-5", 32], [32, "D-5", 34, "H21"], [48, "E-5", 30], [60, "=="]], { inst: I.lead });
+const bridgeLead = mel([[0, "A-4", 34, "H21"], [16, "C-5", 32], [32, "D-5", 34, "H21"], [48, "E-5", 30], [60, "^^"]], { inst: I.lead });
 const bridgeDrone = { 0: { note: "D-3", instrument: I.pad, vol: "v22" } };
 for (let r = 16; r < 64; r += 8) put(bridgeDrone, r, { fx: "D01" });
 const P6 = P([{}, bridgeLead, echo([[0, "A-4", 34], [16, "C-5", 32], [32, "D-5", 34], [48, "E-5", 30]], { delay: 6, scale: 0.5, inst: I.lead }),

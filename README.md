@@ -41,13 +41,35 @@ Every push to `main` auto-deploys the site via GitHub Actions
 ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) — Pages source
 must be set to "GitHub Actions" in the repo settings.
 
+## Composing with an agent
+
+Read [the composition skill](skills/mod-music/SKILL.md). It covers motifs,
+question/answer phrases, rhythm, voice leading, articulation, effects and revision.
+The [song audit](docs/song-audit.md) explains the demonstrated defects and remaining
+limits; [corpus studies](docs/corpus-studies.md) separate evidence from recipes.
+
+A portable original teaching loop uses no downloaded samples:
+
+```sh
+npm test
+npm run build:example           # generates Lantern Walk JSON + IT
+npm run lint:example            # strict check for this supported fixture
+node tools/render.js build/lantern_walk.it
+```
+
+Open `player/?song=../build/lantern_walk.it` on the local server to audition it.
+`npm run build` compiles `songs/demo.json`; use `json2it.js` for other songs.
+Sample `volume` is a default, replaced by a note's explicit `vNN`. Lower event
+volumes or `mixvol` when balancing notes that already stamp their volume.
+
 ## Layout
 
 - `songs/` — song sources (JSON, itwriter structure + `synth`/`file` sample specs)
 - `tools/` — `json2it.js` (compiler), `render.js` (module → WAV + stats),
   `analyze.js` (module structure/stats/pattern dumps), `synth.js`, `wav.js`
-- `.claude/skills/mod-music/` — the composition skill: format reference, library map,
-  corpus-derived composition guidelines, licensing rules
+- `skills/mod-music/` — the canonical composition skill, with musical guidance,
+  verified tracker semantics and critical example studies; discoverable through
+  `.agents/skills/` and `.claude/skills/`
 - `vendor/itwriter/` — vendored [itwriter](https://github.com/chr15m/itwriter) (MIT),
   patched: sample loop points, default volume, C5Speed override
 - `player/` — browser tracker: pattern view with playhead, VU meters, oscilloscope,
@@ -84,17 +106,20 @@ The itwriter structure (title/bpm/ticks/samples/patterns/order — see
 ```
 
 Waves: `sine|square|saw|triangle` (single-cycle, looped, C-5 = middle C),
-`noise|kick` (one-shot percussion). `loop: "cycle"` loops a WAV file
+`noise|kick` (one-shot percussion), `pluck` (decaying pitched tone).
+Noise supports a repeatable `seed`; cycle waves are centered to remove DC. `loop: "cycle"` loops a WAV file
 end-to-end as a single-cycle waveform and tunes it automatically.
 
 ## Rendering / verifying output
 
 `node tools/render.js build/song.it` renders to `build/song.wav` via the same
 libopenmpt WASM the player uses, and prints duration/peak/RMS/clipping stats
-(add `--stats-only` to skip the WAV). `node tools/lint.js songs/song.json`
-simulates note durations and flags forgotten sustains, register clashes, and
-overcrowding — songs must lint clean before they ship. This is how the agent
-checks its own output.
+(add `--stats-only` to skip the WAV). `node tools/lint.js songs/song.json` validates the source and checks the written
+order timeline for sustained notes, arpeggio clashes and density. `--json` emits
+a structured report; `--strict` fails on warnings or incomplete simulation.
+Warnings need musical judgment: a clean report and healthy RMS do not prove
+a good tune. In sample mode, `==` does not stop ordinary loops; use `^^` and
+shape the volume before a cut when needed. Audition the render and loop seams.
 
 ## Adaptive music (CozyAdaptive)
 
@@ -105,11 +130,13 @@ pairs the two:
 
 ```js
 const music = await CozyAdaptive.create('siege_engine.it', 'siege_engine.cozy.json');
-music.setIntensity(0.7);                          // layer muting, sample-accurate
+music.setIntensity(0.7);                          // engine-level layer muting
 music.transitionTo('combat', { via: 'bridge' });  // jump at the next pattern boundary
 ```
 
-Sections loop themselves until a transition is requested. Live demo on the
+Sections loop themselves until a transition is requested. Requests are handled
+at observed pattern boundaries; main-thread scheduling can delay a seek, so
+section transitions are approximate and should be auditioned in context. Live demo on the
 landing page ([index.html](index.html)). See
 [docs/positioning.md](docs/positioning.md) for the why.
 

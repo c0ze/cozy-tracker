@@ -13,17 +13,30 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { parseArgs } from "node:util";
 import libopenmptFactory from "../player/vendor/chiptune3/libopenmpt.worklet.js";
 
-const args = process.argv.slice(2);
-const inFile = args.find((a) => !a.startsWith("--"));
-if (!inFile) {
+let options, positionals;
+try {
+  ({ values: options, positionals } = parseArgs({
+    allowPositionals: true,
+    options: { rate: { type: "string", default: "48000" }, "stats-only": { type: "boolean", default: false } },
+  }));
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+const [inFile, outArg] = positionals;
+if (!inFile || positionals.length > 2) {
   console.error("Usage: node tools/render.js <module> [out.wav] [--rate 48000] [--stats-only]");
   process.exit(1);
 }
-const outArg = args.filter((a) => !a.startsWith("--"))[1];
-const RATE = parseInt(args[args.indexOf("--rate") + 1]) || 48000;
-const statsOnly = args.includes("--stats-only");
+const RATE = Number(options.rate);
+if (!Number.isInteger(RATE) || RATE < 8000 || RATE > 192000) {
+  console.error("--rate must be an integer from 8000 to 192000 Hz");
+  process.exit(1);
+}
+const statsOnly = options["stats-only"];
 
 const lib = await libopenmptFactory();
 
@@ -31,6 +44,7 @@ const bytes = fs.readFileSync(inFile);
 const filePtr = lib._malloc(bytes.length);
 lib.HEAPU8.set(bytes, filePtr);
 const mod = lib._openmpt_module_create_from_memory(filePtr, bytes.length, 0, 0, 0);
+lib._free(filePtr);
 if (!mod) {
   console.error("libopenmpt could not load", inFile);
   process.exit(1);
@@ -86,8 +100,11 @@ if (!statsOnly) {
       data.writeInt16LE(clamp(right[b][i]), off); off += 2;
     }
   }
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, data);
   console.log(`wrote ${outFile} (${(data.length / 1024 / 1024).toFixed(1)} MB)`);
 }
 
 lib._openmpt_module_destroy(mod);
+lib._free(leftPtr);
+lib._free(rightPtr);

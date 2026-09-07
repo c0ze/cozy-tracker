@@ -103,11 +103,11 @@ function stabs({ vols = [40, 40, 40, 40] } = {}) {
 // --- leads --------------------------------------------------------------------
 const WAIL = [ // long siren notes joined by tone porta, deep vibrato
   [0, "E-6", 46, "H42"], [14, undefined], [16, "G-6", 44, "G0C"], [24, "F#6", 42, "G08"],
-  [32, "B-5", 44, "G0C"], [40, "D-6", 44, "G08"], [48, "E-6", 46, "G0C"], [56, "F#6", 40, "H42"], [62, "=="],
+  [32, "B-5", 44, "G0C"], [40, "D-6", 44, "G08"], [48, "E-6", 46, "G0C"], [56, "F#6", 40, "H42"], [62, "^^"],
 ].filter((e) => e[1] !== undefined);
 const WAIL_PEAK = [
   [0, "G-6", 46, "H42"], [16, "B-6", 46, "G0C"], [28, "A-6", 42, "G08"],
-  [32, "E-6", 44, "G0C"], [40, "G-6", 44, "G08"], [48, "E-7", 48, "G10"], [60, "=="],
+  [32, "E-6", 44, "G0C"], [40, "G-6", 44, "G08"], [48, "E-7", 48, "G10"], [60, "^^"],
 ];
 // climax counterpoint: descending step+neighbor chains every 2 rows
 function chains() {
@@ -120,7 +120,7 @@ function chains() {
 const FINALE = (() => {
   const scale = ["E-6", "D-6", "B-5", "A-5", "G-5", "F#5", "E-5", "D-5", "B-4", "A-4", "G-4", "F#4"];
   const ev = scale.map((n, i) => [i * 4, n, 44 - i * 2]);
-  ev.push([48, "E-4", 40, "H31"], [63, "=="]);
+  ev.push([48, "E-4", 40, "H31"], [63, "^^"]);
   return ev;
 })();
 

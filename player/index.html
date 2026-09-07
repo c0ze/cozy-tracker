@@ -387,7 +387,7 @@ async function resolveSample(def) {
   } else {
     s = { ...def };
   }
-  for (const k of ['volume', 'c5speed', 'susloop']) if (def[k] !== undefined && !def.synth) s[k] = def[k];
+  for (const k of ['volume', 'c5speed', 'susloop']) if (def[k] !== undefined) s[k] = def[k];
   if (def.detune) s.c5speed = Math.round((s.c5speed || s.samplerate) * Math.pow(2, def.detune / 1200));
   sampleCache.set(key, s);
   return s;

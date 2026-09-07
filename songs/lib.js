@@ -25,9 +25,39 @@ export function mel(events, { semi = 0, inst = 0, scale = 1, rows = 64 } = {}) {
   return ch;
 }
 
-/** delayed, quieter copy of a melody on its own channel */
-export const echo = (events, { delay = 3, scale = 0.5, semi = 0, inst = 0, rows = 64 } = {}) =>
-  mel(events.map(([r, n, v, f]) => [r + delay, n, v, f]), { semi, scale, inst, rows });
+/** Delayed phrase; clip its tail with a real cut, or explicitly author carry. */
+export function echo(events, { delay = 3, scale = 0.5, semi = 0, inst = 0, rows = 64, boundary = 'cut' } = {}) {
+  return echoChannel(mel(events, { semi, inst, rows }), { delay, scale, rows, boundary });
+}
+
+/** Copy a complete channel, including volume-only envelopes and effect rows. */
+export function echoChannel(channel, { delay = 3, scale = 0.5, semi = 0, inst, rows = 64, boundary = 'cut' } = {}) {
+  if (!Number.isInteger(delay) || delay < 0 || !Number.isInteger(rows) || rows < 1)
+    throw new Error('Echo delay and rows must be nonnegative/positive integers');
+  if (!Number.isFinite(scale) || scale < 0 || !Number.isInteger(semi))
+    throw new Error('Echo scale must be finite/nonnegative and transpose must be an integer');
+  if (!['cut', 'carry'].includes(boundary)) throw new Error('Echo boundary must be cut or carry');
+  const ch = {};
+  for (const [sourceRow, event] of Object.entries(channel)) {
+    const r = Number(sourceRow) + delay;
+    if (!Number.isInteger(r) || r < 0) throw new Error(`Invalid echo source row: ${sourceRow}`);
+    if (r >= rows) continue;
+    const ev = { ...event };
+    if (ev.note && !['==', '^^'].includes(ev.note)) ev.note = up(ev.note, semi);
+    if (inst !== undefined && ev.instrument !== undefined) ev.instrument = inst;
+    if (ev.vol?.startsWith('v')) ev.vol = `v${Math.min(64, Math.round(Number(ev.vol.slice(1)) * scale))}`;
+    ch[r] = ev;
+  }
+  if (boundary === 'cut') {
+    let active = false;
+    for (const r of Object.keys(ch).map(Number).sort((a, b) => a - b)) {
+      if (ch[r].note === '^^') active = false;
+      else if (ch[r].note && ch[r].note !== '==') active = true;
+    }
+    if (active) ch[rows - 1] = { note: '^^' };
+  }
+  return ch;
+}
 
 /** merge event maps for one channel (later wins per row) */
 export const merge = (...chs) => Object.assign({}, ...chs);

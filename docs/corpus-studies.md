@@ -1,126 +1,94 @@
-# Corpus studies — Drozerix deep dives (July 2026)
+# Corpus studies — rechecked September 2026
 
-Distilled from full pattern-level analysis of five PD modules
-(via `tools/analyze.js`). Adopted in: `songs/paper_hearts.gen.js`,
-`songs/siege_engine.gen.js`, `songs/winter_orbit.gen.js`, `songs/night_bus.gen.js`.
-XM effects cited here map to IT as: 0→J, 3→G, 4→H, 9→O, A→D, 1/2→F/E, EC→SC.
+The local collection contains 73 Drozerix modules. Reproduce the structural sweep:
 
-## this_is_how_we_do_it.xm — minimal groove (109 BPM, speed 6, 8ch, 9 patterns)
+```sh
+node tools/analyze.js --corpus library/modules/drozerix --out build/analysis/drozerix.json
+node tools/analyze.js library/modules/drozerix/her_kiss.xm --pattern 0
+node tools/analyze.js library/modules/drozerix/drozerix_-_sleepy_snow.xm --pattern 3
+```
 
-The restraint masterclass: 5 instruments, no vibrato/porta/arpeggio effects at
-all — all dynamics via volume and pan columns. 3-4 elements sounding at any
-moment; the busiest bar has 5 and even then the lead physically replaces a
-chord note. Two chords total (Fm7 3 bars → Gbmaj9 1 bar).
+Median: 124.93 seconds, 6 channels, 24 unique stored patterns, 28 order entries,
+9 samples. Speeds: 3 in 30 modules, 6 in 19, 4 in 10, other values in 14.
+These describe one composer's corpus. They are not quotas or evidence that
+particular channel counts, repetition rates or tempos cause musical quality.
 
-1. **Swap, don't stack**: budget 4 elements (bass, one chord gesture, drums,
-   hat). A lead enters only by REPLACING something — the chord channels are
-   deleted for the whole lead section.
-2. **Write the death of every sustained note**: chords ring 8-16 rows then
-   are re-struck or faded v07→v00 with `===` after; lead phrases end `===`
-   plus a volume-fade tail. Nothing rings unattended, ever.
-3. **One octave band per role, a buffer octave between**: bass oct 4,
-   chords oct 5 (5 voices within ~14 semitones, spread by PAN not pitch),
-   lead oct 7, percussion owns oct 6. Zero pitched overlap in the module.
-4. **Echo is written, not left to ring**: bass ghosts = same note 1-2 rows
-   later at v20/v10 with 9xx offset; lead clone 1 row late on a spare
-   channel, with its own explicit fades.
-5. **Vary repeats with pan/one-stab/fill, not new material**; E61 pattern-
-   loop doubles patterns for free. 2 chords + 2 drum bars carry 97 seconds
-   because sections mute different roles (drums-only / chords-only / lead-only).
+## Pattern evidence and adaptations
 
-## silicon_dancer.mod — 4-channel discipline (125 BPM, speed 6, 225s)
+| Module | Tempo / speed | Channels | Orders / patterns | Nominal seconds |
+|---|---|---:|---:|---:|
+| this_is_how_we_do_it.xm | 109 / 6 | 8 | 9 / 9 | 96.80 |
+| silicon_dancer.mod | 125 / 6 | 4 | 32 / 28 | 224.64 |
+| her_kiss.xm | 128 / 3 | 4 | 48 / 33 | 174.59 |
+| war_path.xm | 144 / 4 | 6 | 38 / 27 | 165.77 |
+| sleepy_snow.xm | 124 / 12 | 14 | 21 / 10 | 87.03 |
 
-MOD, so no volume column: 9xx offset (635 uses!) and Cxx (589) do everything.
+For exact filenames, the first, second, fourth and fifth are prefixed
+`drozerix_-_` in the local directory. Row indices below are decimal; displayed
+XM/MOD effect parameters remain hexadecimal. Channels are zero-based.
 
-1. **Channel roles rotate per section**; within one pattern a channel serves
-   two roles by INTERLEAVING (snare ghosts dropped into the bass line's
-   rests — the bass is written around them). No channel owns drums.
-2. **Row-0 kill**: first row of a pattern explicitly silences (C00) whatever
-   the previous pattern left ringing. Standard hygiene.
-3. **Gated chords**: looped chord sample retriggered C30→C00→C30→C00 as a
-   rhythmic pulse — sustained sound, zero unattended ringing.
-4. **Motion from parameters, not pitches**: hold one note and walk 9xx
-   offsets (fake filter sweep), volume gates, instrument-retrigger + A0x
-   pump. Busy texture with no new harmonic events.
-5. **Perceived density**: same-channel echo (previous pitch repeated at C20
-   on odd rows), cross-channel 2-3-row delay lines at 1/3 volume, ramping
-   vibrato on long notes. At any instant only 1-2 channels move fast.
-6. Deliberate ringing exists ONCE per section: a crash decaying into an
-   empty half-pattern (D00 break) as a transition.
+### This Is How We Do It: repeated harmony with moving rhythm
 
-## her_kiss.xm — dense 4-channel melodic chip (128 BPM, speed 3, D aeolian)
+Pattern 0 begins with bass on channel 0, a five-voice upper chord across channels
+1–5, and rhythmic voices on 6–7. The chord is rearticulated at rows 16, 24, 32,
+48, 56 and 60; the harmony changes at 24 and 56. Bass events at rows 12–14 and
+44–46 show quieter repeated notes with sample-offset changes. Row 63 contains E61,
+a MOD/XM pattern-loop command, so the order list alone is not the complete form.
 
-Form: 48 orders, chorus-first (chorus stated quietly as the intro, delivered
-loud later). Variation = re-orchestration of the SAME melody: porta/vibrato
-lead → arp-chord version → calm long-note version. Ends with a global-volume
-fade over a chorus repeat, then a loop jump — no cadence.
+Transfer the common-tone chord gesture and bass ghost rhythm. The old study's
+“no overlap,” “four elements means four sounding pitches,” and universal buffer
+octaves were overstatements: this pattern has five chord voices plus bass, and
+some bass/chord note registers overlap. Sample tuning and instruments matter.
 
-Key techniques:
-1. **Liquid harp**: one channel plays a chord tone EVERY row (~17/s);
-   first note of each phrase retriggers, all others carry 3FF (instant tone
-   porta = glide, no retrigger); pan column walks p18→p28 per row.
-2. **Chord-carrying melody**: every lead note gets the arpeggio effect for
-   its triad, inversion chosen so the melody note stays on top
-   (root 037/J37, 3rd-on-top J49/J38, 5th-on-top J58/J59); held notes get
-   alternating v40/v10 volume stamps = built-in delay pulse.
-3. **Bass-as-drums**: no drum channel at all. Octave-bounce root 8ths on a
-   D pedal (rows 0,4,6,8,10,12,14 per 16-row bar), brighter instrument
-   swapped in on the backbeat row; last 8 rows of nearly every pattern
-   become an every-2-rows accent roll (the universal fill).
-4. **Pedal harmony**: bass never leaves D for ~3 minutes; the i–VII–v drift
-   (Dm→C→Am) happens entirely in melody arps and upper channels.
-5. Cross-channel echo: lead replayed 4 rows later at ~65% volume on a
-   channel that doubles as riser/faller at transitions (1xx/2xx sweeps,
-   full glissando cascades via 3F0 chains).
+### Silicon Dancer: sharing four voices
 
-## war_path.xm — aggressive 6-channel driver (144 BPM, speed 4, A aeolian)
+The four-channel MOD uses abundant Cxx volume and 9xx sample-offset commands
+(589 and 635 effect cells respectively in the structural sweep). Those controls
+let a small palette change articulation/texture without adding a fresh line.
+Inspect a chosen phrase's channel swaps before adapting it. Sharing a channel
+means the new note replaces the previous sound; compose rests around that theft.
+MOD Cxx is **not** IT Cxx. Its volume function should become JSON vNN; IT Cxx
+breaks a pattern. A count of offset commands does not describe their audible effect.
 
-Form: layer-additive build (drums → bass → dropout breath → riff → stabs
-fading in v08→v28 a full pattern early) → theme A → strip-and-rebuild
-breaks → theme B (wailing canon lead) → registral peak → climax adds
-counterpoint density instead of height → finale cascade.
+### Her Kiss: an arpeggio is performed on every held row
 
-Key techniques:
-1. **Choked octave-pulse bass**: note every 2 rows alternating root octaves,
-   volume-column v10 stamp on the following row chokes each hit — a
-   pounding staccato engine from one channel.
-2. **Ghost-accent snare march**: snare on EVERY even row; accents (v30)
-   placed to outline the kick's syncopation, ghosts (v18) between.
-3. **War-horn drone + bVII turnaround**: one channel holds the root pedal
-   the whole song (re-pumped with volume swells); the last 8–12 rows of
-   most patterns drop bass+drone to bVII, snapping back at the seam —
-   a built-in 4-bar tension/release cycle.
-4. **8-row riff loop**: octave leap up then stepwise descent
-   (A5|A6|E6 D6 C6 B5|G5 B5), every other note a ghost — repeated verbatim
-   8× per pattern.
-5. **Two-channel canon echo**: lead copied 2–3 rows later at ~half volume;
-   works for slow porta wails (3xx+4A2) and fast 2-row descending chains.
-6. **037-arp pump pad**: sustained root with minor-triad arpeggio buzz,
-   volume re-stamped v38→v28→v18 in 2-row groups = sidechain-feel chord bed.
+Pattern 0 channel 1 starts D-7 with 037 and alternates volumes while repeating
+037 through row 5. A-6/058 follows at rows 6–11, then F-6/049 at 12–15. Channel 3
+contains a rapidly moving line with 3FF on many notes and changing pan; channel 2
+uses many 6xx continuation rows. The synthesis depends on all those held-row
+commands and XM instrument behavior, not just the first note's effect.
 
-## sleepy_snow.xm — sparse ambient ballad (124 BPM, speed 12, A aeolian)
+In IT, repeat J on the held rows, and design the envelope separately. Arpeggio
+offsets rise from their base: F +4/+9 produces F/A/D, so F is not the highest pitch.
+Choose actual sounding notes before attaching labels such as “melody on top.”
+The 64 rows at speed 3 are two bars under a quarter-note/4/4 interpretation.
 
-Form: symmetric arch — 8-row bookend cells open AND close the piece
-(`0,0,8,8 … 0,0,8,8`); pattern lengths follow the phrase (4/8/16/32/40
-rows); a 4-row all-note-off "exhale" cell sits between sections; E6x
-pattern-loop doubles a section for free.
+### War Path: accent and gate create the drive
 
-Key techniques:
-1. **Slow clock + ring**: speed 12 (~242ms/row); one event per 2–8 rows;
-   long-decay samples ring across empty rows — silence is the reverb.
-   Half the channels are deliberately empty in early sections.
-2. **Split arpeggio**: one arpeggio distributed across 3 bell channels
-   (anchor on downbeats / ostinato every 4 rows offset +2 / answer on
-   row 4) so successive notes overlap into a chord.
-3. **Channel echo cascade**: each pad source channel has a partner that
-   repeats every note 2 rows (~0.5s) later at v20, some with a third
-   repeat at v10 — six channels forming a hard-wired delay line.
-4. **Shimmer-hold vibrato**: sustained notes enter with 4A1 (fast, very
-   shallow) and carry 400 (continue) on every held row — subtle constant
-   motion, a poor man's chorus. ~90% of the song's 369 "vibrato" cells
-   are continuations.
-5. **Signature gestures**: hard-panned L/R semitone call-answer pair
-   (p3C then p00 one row later); a porta-down (2xx) "sighing" pedal tone;
-   final chords materialize at quarter volume (v10 echoes only).
-6. Harmony: i↔bVII sway (Am↔G), one chord per ~4s; bVI (F) bridge with a
-   long scalar descent handing back to i.
+Pattern 0 opens by releasing several channels, while channels 2–3 provide short
+rhythmic events and volume slides/retriggers. Channel 2 ends many hits on the next
+row. The descending pickup on channel 0 at rows 56–63 prepares the next pattern.
+The contrast between fixed rhythm, choked articulation and a late pickup is a
+more useful recipe than simply adding a drone, riff, canon and arp simultaneously.
+At speed 4, 16 rows span 2⅔ quarter notes; a 16-row generator block needs an explicit
+meter/tempo interpretation before it can be called a 4/4 bar.
+
+### Sleepy Snow: tails and releases are part of the score
+
+The module has 14 channels but only 3 samples and 3 instruments. Pattern lengths
+are 4/8/16/32/40 rows, shaped to its sections. Of its 369 vibrato cells, many are
+held-row continuations. Pattern 3 is a four-row cell: row 0 releases channels
+8–13 while earlier channels remain untouched. It is not an all-channel silence.
+
+The overlapping tail is the harmony. In sample-only IT, copying a release marker
+from an XM instrument is insufficient: an ordinary looping sample ignores key-off
+as an amplitude ending. Recreate the envelope with volume and cuts, or deliberately
+use one-shots with known pitch-scaled tails. Long delays and sparse overlapping
+voicings are legitimate here; a universal one-row-echo rule would destroy the idea.
+
+## Apply the studies
+
+The [composition skill](../skills/mod-music/SKILL.md) routes to the authoring
+reference and an original runnable example. Its [example critique](../skills/mod-music/references/example-studies.md)
+compares these techniques with the generated songs. The conclusions here are
+structural analysis, not a claim of having listened to the collection.

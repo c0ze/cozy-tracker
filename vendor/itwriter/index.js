@@ -130,7 +130,7 @@ function itwriter(struct) {
   offset++;
 
   // MV - mix volume
-  data.setUint8(offset, (struct.mixvol || 48));
+  data.setUint8(offset, (struct.mixvol ?? 48));
   offset++;
 
   // IS - initial speed of song - ticks per row
@@ -251,8 +251,8 @@ function itwriter(struct) {
   for (let s = 0; s < SmpNum; s++) {
     const wavData = floatChannelsTo16bit(struct.samples[s].channels);
     for (let c = 0; c < wavData.length; c++) {
-      insertData(data, wavData[0], offset);
-      offset += wavData[0].byteLength;
+      insertData(data, wavData[c], offset);
+      offset += wavData[c].byteLength;
     }
   }
 

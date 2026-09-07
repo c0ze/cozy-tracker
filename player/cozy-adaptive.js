@@ -26,8 +26,10 @@ export class CozyAdaptive {
     this.intensity = 1;
     this.section = null;
     this._queue = [];        // pending section transitions
+    this._nextBoundary = false; // start a new request at the next pattern
     this._settling = null;   // section we just jumped to, until observed
     this._lastOrder = -1;
+    this._lastRow = -1;
     this._sectionCbs = [];
     this._progressCbs = [];
     this.playing = false;
@@ -80,6 +82,7 @@ export class CozyAdaptive {
     if (!this.manifest.sections?.[name]) throw new Error(`unknown section: ${name}`);
     if (opts.via && !this.manifest.sections[opts.via]) throw new Error(`unknown section: ${opts.via}`);
     this._queue = opts.via ? [opts.via, name] : [name];
+    this._nextBoundary = true;
     if (opts.now || !this.playing) this._advance();
     return this;
   }
@@ -99,16 +102,28 @@ export class CozyAdaptive {
     this.section = name;
     this._settling = name;
     this._lastOrder = -1; // force re-evaluation: the jump may target the order we're already on
+    this._lastRow = -1;
     this.player.setOrderRow(this._range(name)[0], 0);
     for (const cb of this._sectionCbs) cb(name);
   }
 
-  _advance() { if (this._queue.length) this._jump(this._queue.shift()); }
+  _advance() {
+    if (!this._queue.length) return;
+    // After entering a via section, play its complete range before advancing.
+    this._nextBoundary = false;
+    this._jump(this._queue.shift());
+  }
 
   _onProgress(d) {
     for (const cb of this._progressCbs) cb(d);
-    if (d.order === this._lastOrder) return;
+    const previousOrder = this._lastOrder;
+    // A one-order module wraps without changing order. Internal SBx loops to
+    // row zero are indistinguishable here; adaptive sections use linear patterns.
+    const rowWrapped = d.order === previousOrder && d.row === 0 && this._lastRow > 0;
+    const boundary = d.order !== previousOrder || rowWrapped;
     this._lastOrder = d.order;
+    this._lastRow = d.row;
+    if (!boundary) return;
     const [s, e] = this.section ? this._range(this.section) : [0, Infinity];
 
     if (this._settling) {
@@ -116,8 +131,12 @@ export class CozyAdaptive {
       if (d.order >= s && d.order <= e) this._settling = null;
       return;
     }
-    if (d.order > e || d.order < s) {
-      // pattern boundary crossed out of the section: transition or loop
+    const sectionEnded = d.order > e || d.order < s ||
+      (previousOrder === e && (d.order < previousOrder || rowWrapped));
+    if (this._queue.length && this._nextBoundary) {
+      this._advance();
+    } else if (sectionEnded) {
+      // Finish the whole bridge, or loop the section with no pending request.
       if (this._queue.length) this._advance();
       else this._jump(this.section); // loop the section
     }

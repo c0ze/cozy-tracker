@@ -22,7 +22,7 @@ func _on_combat_started() -> void:
     music.transition_to("combat", "bridge")   # via the bridge, at the next boundary
 
 func _on_danger_changed(danger: float) -> void:
-    music.set_intensity(danger)               # layers drop in/out, sample-accurate
+    music.set_intensity(danger)               # engine-level channel muting
 ```
 
 Signals: `section_changed(section_name)` fires on every section jump
@@ -39,3 +39,8 @@ Notes:
 Status: API-verified against godot-openmpt v1.3 source (`seek(order, row)`,
 `set_channel_mute_status`, `get_current_order`); not yet CI-tested inside a
 Godot project — report issues.
+
+Transitions are scheduled from frame-polled order/row updates. They are not
+sample-accurate and require audition in the target game. The wrapper passes a
+Godot syntax/type check with an AudioStreamMPT stub; real GDExtension playback
+remains untested in this repository.
