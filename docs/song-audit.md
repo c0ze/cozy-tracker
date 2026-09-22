@@ -120,6 +120,33 @@ The final independent Codex CLI review reported:
 
 Its 51-test read-only subset is separate from the full 61-test local suite above.
 
+## Follow-up audit — 2026-09-23
+
+Baseline `bd3d251`. Code-only pass over the runtime, web pages, compiler and tools;
+every fix below has a regression test that fails on the baseline (76 tests total),
+except the browser-only UI changes, which were exercised in a local browser.
+No listening occurred and no song content changed: every song rebuilds to the
+same rendered peak/RMS as its shipped module.
+
+| Priority | Location | Result |
+|---|---|---|
+| P1 | `chiptune3.worklet.js` tempo/pitch | Each slider event leaked WASM stack; ~1,090 changes corrupted memory and silenced audio. Stack-scoped `ctl_set`. |
+| P1 | `tools/analyze.js` CLI | `--json x.it x.it` overwrote the module; flag values were read as paths. `parseArgs`, self-overwrite refusal, range checks, non-zero exit on load failure. |
+| P1 | `json2it` / `writeSong` | Output could resolve to the input (non-`.json` input; non-`.gen.js` generator). Both now refuse. |
+| P1 | `cozy-adaptive.js` `create()` | Hung forever on worklet/module/HTTP failure. Now rejects with a timeout and closes its AudioContext; `dispose()` added. Landing demos no longer leak a context per Start/Stop. |
+| P2 | `player/index.html` | Default song needed unshipped `library/` samples; load errors were swallowed; ▶ after ■ discarded unsaved edits; infinite init poll; 18-channel songs were unreachable past the viewport. |
+| P2 | `listen/jukebox.js`, `index.html` | Failed engine start cached forever; unreadable modules left a silent "playing" state; jukebox and adaptive demos played simultaneously. |
+| P2 | `chiptune3.worklet.js` | Metadata strings leaked (~6.8 KB/load); `end` posted every render quantum after a song finished. |
+| P2 | `songs/lib.js` `echoChannel` | Boundary cut replaced an echoed onset on the final row. |
+| P2 | `json2it` | `detune` ignored on raw PCM samples; `loop` dropped on synth samples although lint modelled it. |
+| P2 | `vendor/itwriter` | Unicode wrote low bytes (`→` became `0x92`); Special bit 1 promised an absent edit-history block. Text is transliterated before truncation; messages use CR. |
+| P3 | validator | Non-string `title`/`message`/names and bad `channelnames` crashed the writer; >8000-char messages were truncated. |
+| P3 | `engines/godot` | Validation relied on `assert` (stripped in release exports); a parse failure assigned `null` to a typed Dictionary. Headless Godot check with a stubbed extension. |
+| P3 | misc | `serve.py` bound all interfaces (serving `.git/`); streamed WAV size markers rejected; editor sample paths could reach another host; keyboard access for jukebox rows and snippet tabs; ARIA labels; stale landing copy. |
+
+Not addressed: canvas mute/solo still needs a mouse; the lint warnings in the older
+songs are musical prompts that need audition, not mechanical fixes.
+
 ## Remaining limits
 
 - **Perceptual quality:** the old dense arrangements still need audition and musical
@@ -136,8 +163,6 @@ Its 51-test read-only subset is separate from the full 61-test local suite above
   assets omitted from deployment. Their prebuilt `.it` files play, but rebuilding
   those JSONs in the public editor needs sample packaging. Lantern Walk and demo
   use synthesis and do not have that dependency.
-- **Adaptive initialization failure:** initialization/metadata promises lack a
-  complete timeout/error-propagation path when the worklet or module fails to load.
 - **Godot:** syntax/type checking passed with an AudioStreamMPT stub and methods
   were checked against the upstream bindings. Actual GDExtension audio playback
   has not been tested in a game.

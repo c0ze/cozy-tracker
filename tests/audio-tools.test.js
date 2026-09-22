@@ -230,3 +230,36 @@ test('libopenmpt keeps ordinary sample loops after == and silences them after ^^
     assert.ok(rowRms(row) < 1e-6, `note cut left audio sounding in row ${row}`);
   }
 });
+
+test('WAV accepts streamed size markers and ignores damaged metadata after the audio', () => {
+  const streamed = wav({ bits: 16, values: [0.5, -0.5, 0.25] });
+  streamed.writeUInt32LE(0xffffffff, 4);
+  streamed.writeUInt32LE(0xffffffff, streamed.indexOf('data') + 4);
+  assert.equal(readWav(streamed).channels[0].length, 3);
+
+  const base = wav({ bits: 16, values: [0.5, -0.5] });
+  const trailing = Buffer.concat([base, Buffer.from('LIST'), Buffer.from([100, 0, 0, 0]), Buffer.from('INFO')]);
+  trailing.writeUInt32LE(trailing.length - 8, 4);
+  assert.equal(readWav(trailing).channels[0].length, 2);
+
+  const truncatedAudio = wav({ bits: 16, values: [0.5, -0.5] }).subarray(0, -2);
+  truncatedAudio.writeUInt32LE(truncatedAudio.length - 8, 4);
+  assert.throws(() => readWav(truncatedAudio), /Truncated WAV data chunk/);
+});
+
+test('writer stores Unicode text as ASCII without spilling into later fields', () => {
+  const b = Buffer.from(itwriter({
+    title: 'Siege → Night — Café ♪', message: 'line one\nline two',
+    samples: [{ name: '→→→→→→→→→→→→→→', ...synthesize({ wave: 'sine' }) }],
+    patterns: [{ rows: 1, channels: [{}] }], order: [0],
+  }));
+  assert.equal(b.toString('latin1', 4, 30).replace(/\0+$/, ''), 'Siege -> Night - Cafe ~');
+  const special = b.readUInt16LE(0x2e);
+  assert.equal(special & 0x2, 0, 'no edit-history block is promised');
+  assert.equal(special & 0x1, 1, 'message flag');
+  const msg = b.toString('latin1', b.readUInt32LE(0x38), b.readUInt32LE(0x38) + b.readUInt16LE(0x36));
+  assert.equal(msg, 'line one\rline two\0');
+  const ptr = b.readUInt32LE(0xc0 + b.readUInt16LE(0x20));
+  assert.equal(b.toString('latin1', ptr + 0x14, ptr + 0x14 + 26), '->'.repeat(13));
+  assert.equal(b[ptr + 0x2e], 1, 'convert flag follows the 26-byte name intact');
+});

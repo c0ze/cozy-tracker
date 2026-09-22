@@ -30,7 +30,8 @@ const MIDDLE_C = 261.6256;
 function resolveSample(def) {
   if (def.synth) {
     const s = synthesize(def.synth);
-    return applyDetune({ name: def.name, ...s, ...overrides(def) }, def);
+    const loop = def.loop ? { loop: def.loop } : {}; // validator allows only {start,end} here
+    return applyDetune({ name: def.name, ...s, ...loop, ...overrides(def) }, def);
   }
   if (def.file) {
     const wav = readWav(fs.readFileSync(path.resolve(ROOT, def.file)));
@@ -44,7 +45,7 @@ function resolveSample(def) {
     }
     return applyDetune({ ...s, ...overrides(def) }, def);
   }
-  return def; // raw itwriter sample
+  return applyDetune({ ...def }, def); // raw itwriter sample
 }
 
 // explicit per-sample settings win over derived ones
@@ -73,7 +74,11 @@ assertSong(song);
 song.samples = (song.samples || []).map(resolveSample);
 assertSong(song);
 
-const outFile = outFileArg || path.join(ROOT, "build", path.basename(inFile).replace(/\.json$/, ".it"));
+const outFile = outFileArg || path.join(ROOT, "build", path.basename(inFile, path.extname(inFile)) + ".it");
+if (path.resolve(outFile) === path.resolve(inFile)) {
+  console.error(`refusing to overwrite the input: ${inFile}`);
+  process.exit(1);
+}
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 
 const buf = itwriter(song);

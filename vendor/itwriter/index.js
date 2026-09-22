@@ -39,13 +39,15 @@ function itwriter(struct) {
   const PatNum = patterns.length;
 
   // calculate pattern and channel names and sizes
-  const patternnames = patterns.map((pattern) => pattern.name || "");
+  const patternnames = patterns.map((pattern) => text(pattern.name, 32));
   const PNAMSize = patternnames.length ? ("PNAM".length + 4 + patternnames.length * 32) : 0;
-  const channelnamecount = struct.channelnames ? Math.max.apply(null, Object.keys(struct.channelnames)) : -1;
-  const channelnames = [...(new Array(channelnamecount + 1))].map((x, i)=>struct.channelnames[i] || "");
+  const channelnamecount = struct.channelnames ? Math.max(-1, ...Object.keys(struct.channelnames).map(Number).filter(Number.isInteger)) : -1;
+  const channelnames = [...(new Array(channelnamecount + 1))].map((x, i)=>text(struct.channelnames[i], 20));
   const CNAMSize = channelnames.length ? ("CNAM".length + 4 + channelnames.length * 20) : 0;
   // optional message embedding
-  const MSGSize = struct.message ? (struct.message.length) + 1 : 0;
+  // IT stores 8-bit text with CR line breaks.
+  const message = struct.message ? toAscii(struct.message).replace(/\r?\n/g, "\r") : "";
+  const MSGSize = message ? message.length + 1 : 0;
   // Calculate output file size
   // Calculate the headerSize of the impulse tracker file
   // Initial part of header is always 0xC0 / 192 bytes
@@ -82,7 +84,7 @@ function itwriter(struct) {
   offset += 4;
 
   // Song title
-  writeString(data, offset, (struct.title || "").slice(0, 26));
+  writeString(data, offset, text(struct.title, 26));
   offset += 26;
 
   // PHiligt - pattern row hilight information
@@ -121,8 +123,9 @@ function itwriter(struct) {
   data.setUint16(offset, 0x0049, true);
   offset += 2;
 
-  // Special / message flag
-  data.setUint16(offset, 0x0006 | (struct.message ? 0x0001 : 0x0000), true);
+  // Special: bit 0 message attached, bit 2 row highlights. Bit 1 would promise
+  // an edit-history block after the parapointers, which is not written.
+  data.setUint16(offset, 0x0004 | (message ? 0x0001 : 0x0000), true);
   offset += 2;
 
   // GV - global volume
@@ -154,7 +157,7 @@ function itwriter(struct) {
   offset += 2;
   
   // MsgOffset
-  data.setUint32(offset, struct.message ? headerSize - MSGSize: 0, true);
+  data.setUint32(offset, message ? headerSize - MSGSize: 0, true);
   offset += 4;
 
   // Reserved (OpenMPT writes "OMPT" here for interpreted modplug file)
@@ -212,7 +215,7 @@ function itwriter(struct) {
     data.setUint32(offset, patternnames.length * 32, true);
     offset += 4;
     for (let i = 0; i < patternnames.length; i++) {
-      writeString(data, offset, patternnames[i].slice(0, 32));
+      writeString(data, offset, patternnames[i]);
       offset += 32;
     }
   }
@@ -224,14 +227,14 @@ function itwriter(struct) {
     data.setUint32(offset, channelnames.length * 20, true);
     offset += 4;
     for (let i = 0; i < channelnames.length; i++) {
-      writeString(data, offset, channelnames[i].slice(0, 20));
+      writeString(data, offset, channelnames[i]);
       offset += 20;
     }
   }
   
   // Write message data
-  if (struct.message) {
-    writeString(data, offset, struct.message);
+  if (message) {
+    writeString(data, offset, message);
     offset += MSGSize;
   }
 
@@ -269,7 +272,7 @@ function serializeSampleHeader(sample, previousOffset) {
   offset += 4;
 
   // DOS filename
-  writeString(data, offset, (sample.filename || sample.name || "").slice(0, 12));
+  writeString(data, offset, text(sample.filename || sample.name, 12));
   offset += 12;
 
   // Always null
@@ -299,7 +302,7 @@ function serializeSampleHeader(sample, previousOffset) {
   offset++;
 
   // Skip sample name
-  writeString(data, offset, (sample.name || sample.filename || "").slice(0, 26));
+  writeString(data, offset, text(sample.name || sample.filename, 26));
   offset += 26;
 
   // Cvt / convert (bitmask; bit 1 on = signed samples; off = unsigned)
@@ -459,6 +462,17 @@ function floatChannelsTo16bit(channels) {
     int16Array.buffer.sampleLength = channel.length;
     return int16Array.buffer;
   });
+}
+
+// IT text fields are single-byte; transliterate common Unicode punctuation
+// before truncating so a wide character cannot spill into the next field.
+const ASCII = { "→": "->", "←": "<-", "—": "-", "–": "-", "‘": "'", "’": "'", "“": '"', "”": '"', "…": "...", "·": ".", "×": "x", "♪": "~", "♯": "#", "♭": "b" };
+function toAscii(value) {
+  return String(value ?? "").replace(/[^\x00-\x7f]/g, (c) => ASCII[c] ??
+    (c.normalize("NFKD").replace(/[^\x20-\x7e]/g, "") || "?"));
+}
+function text(value, length) {
+  return toAscii(value).slice(0, length);
 }
 
 function writeString(view, offset, string) {

@@ -25,7 +25,8 @@ jobs:
 
       - name: Stage site
         # everything the pages need, nothing else:
-        # - player edit mode imports /vendor/itwriter, /tools/*.js and loads /songs/*.json
+        # - player edit mode imports /vendor/itwriter, /tools/*.js and loads /songs/*.json;
+        #   only synthesized songs (lantern_walk, demo) compile there — library/ samples are not shipped
         # - demos/ holds the shipped modules + adaptive manifests
         run: |
           mkdir _site

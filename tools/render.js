@@ -37,6 +37,10 @@ if (!Number.isInteger(RATE) || RATE < 8000 || RATE > 192000) {
   process.exit(1);
 }
 const statsOnly = options["stats-only"];
+if (statsOnly && outArg) {
+  console.error("--stats-only writes no WAV; drop the output path or the flag");
+  process.exit(1);
+}
 
 const lib = await libopenmptFactory();
 
@@ -85,7 +89,7 @@ if (peak === 0) console.warn("WARNING: silence — something is wrong");
 if (peak > 1) console.warn("WARNING: clipping — lower mixvol or sample volumes");
 
 if (!statsOnly) {
-  const outFile = outArg || path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "build", path.basename(inFile).replace(/\.[^.]+$/, ".wav"));
+  const outFile = outArg || path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "build", path.basename(inFile, path.extname(inFile)) + ".wav");
   // 16-bit PCM stereo WAV
   const data = Buffer.alloc(44 + frames * 4);
   data.write("RIFF", 0); data.writeUInt32LE(36 + frames * 4, 4); data.write("WAVE", 8);

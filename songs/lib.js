@@ -54,7 +54,11 @@ export function echoChannel(channel, { delay = 3, scale = 0.5, semi = 0, inst, r
       if (ch[r].note === '^^') active = false;
       else if (ch[r].note && ch[r].note !== '==') active = true;
     }
-    if (active) ch[rows - 1] = { note: '^^' };
+    // Never replace an echo event already on the final row: a volume/effect
+    // row gains the cut; an onset there is kept (and may ring into the next pattern).
+    const last = ch[rows - 1];
+    if (active && !last) ch[rows - 1] = { note: '^^' };
+    else if (active && !last.note) ch[rows - 1] = { ...last, note: '^^' };
   }
   return ch;
 }
@@ -63,6 +67,7 @@ export function echoChannel(channel, { delay = 3, scale = 0.5, semi = 0, inst, r
 export const merge = (...chs) => Object.assign({}, ...chs);
 
 export function writeSong(metaUrl, song) {
+  if (!/\.gen\.js$/.test(metaUrl)) throw new Error(`writeSong expects a *.gen.js generator, got ${metaUrl}`);
   const out = new URL(metaUrl.replace(/\.gen\.js$/, ".json"));
   fs.writeFileSync(out, JSON.stringify(song, null, 1));
   console.log(`${out.pathname.split("/").pop()}: ${song.patterns.length} patterns, order [${song.order}] (${song.order.length} entries)`);

@@ -37,21 +37,39 @@ export class CozyAdaptive {
     player.onProgress((d) => this._onProgress(d));
   }
 
-  /** Load module + manifest and start (paused audio contexts resume on play). */
+  /**
+   * Load module + manifest and start. Rejects (instead of hanging) when the
+   * worklet, manifest or module cannot load, or after opts.timeout ms
+   * (default 15000). A failed create closes the AudioContext it opened.
+   */
   static async create(moduleUrl, manifest, opts = {}) {
-    if (!window.isSecureContext || !('audioWorklet' in (window.AudioContext?.prototype ?? {}))) {
-      throw new Error(`audio needs HTTPS — open https://${location.host}${location.pathname}`);
+    const g = globalThis;
+    if (!opts.createPlayer && (!g.isSecureContext || !('audioWorklet' in (g.AudioContext?.prototype ?? {})))) {
+      throw new Error(`audio needs HTTPS — open https://${g.location?.host}${g.location?.pathname}`);
     }
-    if (typeof manifest === 'string') manifest = await (await fetch(manifest)).json();
-    const player = new ChiptuneJsPlayer({ repeatCount: -1, context: opts.context });
-    await new Promise((resolve) => player.onInitialized(resolve));
-    const buf = await (await fetch(moduleUrl)).arrayBuffer();
-    const ready = new Promise((resolve) => player.onMetadata(resolve));
-    player.play(buf);
-    await ready;
+    const timeout = opts.timeout ?? 15000;
+    // Construct before any await so the AudioContext is created inside the user gesture.
+    const player = opts.createPlayer
+      ? opts.createPlayer()
+      : new ChiptuneJsPlayer({ repeatCount: -1, context: opts.context });
+    const ownsContext = !opts.context;
+    try {
+      const initialized = waitFor(player, 'onInitialized', timeout, 'audio worklet');
+      if (typeof manifest === 'string') manifest = await fetchChecked(manifest, (r) => r.json());
+      validateManifest(manifest);
+      const buf = await fetchChecked(moduleUrl, (r) => r.arrayBuffer());
+      await initialized;
+      const ready = waitFor(player, 'onMetadata', timeout, 'module');
+      player.play(buf);
+      await ready;
+    } catch (e) {
+      disposePlayer(player, ownsContext);
+      throw e;
+    }
     const ca = new CozyAdaptive(player, manifest);
+    ca._ownsContext = ownsContext;
     ca.playing = true;
-    ca._jump(manifest.loop || Object.keys(manifest.sections || {})[0]);
+    ca._jump(manifest.loop || Object.keys(manifest.sections)[0]);
     ca.setIntensity(opts.intensity ?? 1);
     return ca;
   }
@@ -94,6 +112,14 @@ export class CozyAdaptive {
   resume() { this.player.unpause(); this.playing = true; return this; }
   setVolume(v) { this.player.setVol(v); return this; }
   stop() { this.player.stop(); this.playing = false; return this; }
+  /** Stop and release audio resources; closes the AudioContext create() opened. */
+  dispose() {
+    this.playing = false;
+    this._queue = [];
+    this._sectionCbs = [];
+    this._progressCbs = [];
+    disposePlayer(this.player, this._ownsContext);
+  }
 
   // --- internals -------------------------------------------------------------
   _range(name) { return this.manifest.sections[name]; }
@@ -115,6 +141,7 @@ export class CozyAdaptive {
   }
 
   _onProgress(d) {
+    if (!this.playing) return;
     for (const cb of this._progressCbs) cb(d);
     const previousOrder = this._lastOrder;
     // A one-order module wraps without changing order. Internal SBx loops to
@@ -141,4 +168,44 @@ export class CozyAdaptive {
       else this._jump(this.section); // loop the section
     }
   }
+}
+
+function validateManifest(m) {
+  const names = Object.keys(m?.sections ?? {});
+  if (!names.length) throw new Error('manifest has no sections');
+  for (const name of names) {
+    const r = m.sections[name];
+    if (!Array.isArray(r) || r.length !== 2 || !r.every(Number.isInteger) || r[0] < 0 || r[1] < r[0]) {
+      throw new Error(`manifest section ${name} must be [firstOrder, lastOrder]`);
+    }
+  }
+  if (m.loop != null && !m.sections[m.loop]) throw new Error(`manifest loop names unknown section: ${m.loop}`);
+  for (const layer of m.layers ?? []) {
+    if (!Array.isArray(layer.channels) || !layer.channels.every((c) => Number.isInteger(c) && c >= 0)) {
+      throw new Error(`manifest layer ${layer.name} needs integer channels`);
+    }
+  }
+}
+
+async function fetchChecked(url, read) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  return read(res);
+}
+
+// chiptune3 handlers cannot be removed, so each waiter ignores late events.
+function waitFor(player, event, ms, what) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const settle = (fn, v) => { if (!done) { done = true; clearTimeout(timer); fn(v); } };
+    const timer = setTimeout(() => settle(reject, new Error(`${what} did not load within ${ms} ms`)), ms);
+    player[event]((v) => settle(resolve, v));
+    player.onError?.((e) => settle(reject, new Error(`${what} failed to load (${e?.type ?? 'error'})`)));
+  });
+}
+
+function disposePlayer(player, closeContext) {
+  try { player.stop?.(); } catch { /* already gone */ }
+  try { player.processNode?.disconnect(); } catch { /* not connected */ }
+  if (closeContext && player.context?.state !== 'closed') player.context?.close?.().catch(() => {});
 }

@@ -12,6 +12,7 @@
 
 import fs from "fs";
 import path from "path";
+import { parseArgs } from "node:util";
 import libopenmptFactory from "../player/vendor/chiptune3/libopenmpt.worklet.js";
 
 const lib = await libopenmptFactory();
@@ -153,6 +154,12 @@ function analyzeModule(file, opts = {}) {
 
 function printPattern(file, patIdx) {
   const mod = loadModule(file);
+  if (!mod) fail(`${file}: could not load module`);
+  const nPat = lib._openmpt_module_get_num_patterns(mod);
+  if (patIdx >= nPat) {
+    lib._openmpt_module_destroy(mod);
+    fail(`${file}: pattern ${patIdx} out of range (0..${nPat - 1})`);
+  }
   const nCh = lib._openmpt_module_get_num_channels(mod);
   const rows = lib._openmpt_module_get_pattern_num_rows(mod, patIdx);
   for (let r = 0; r < rows; r++) {
@@ -166,16 +173,27 @@ function printPattern(file, patIdx) {
 }
 
 // --- CLI ---
-const args = process.argv.slice(2);
-const flag = (name) => {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-};
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+const USAGE = "Usage: node tools/analyze.js <module> [--pattern N] [--json out.json] | --corpus <dir> [--out file]";
+let flags, positionals;
+try {
+  ({ values: flags, positionals } = parseArgs({
+    allowPositionals: true,
+    options: { pattern: { type: "string" }, json: { type: "string" }, corpus: { type: "string" }, out: { type: "string" } },
+  }));
+} catch (e) {
+  fail(`${e.message}\n${USAGE}`);
+}
 
-if (args.includes("--corpus")) {
-  const dir = flag("--corpus");
-  const out = flag("--out") || "build/analysis/corpus.json";
+if (flags.corpus !== undefined) {
+  if (positionals.length) fail(USAGE);
+  const dir = flags.corpus;
+  const out = flags.out || "build/analysis/corpus.json";
   const files = fs.readdirSync(dir).filter((f) => /\.(it|xm|mod|s3m)$/i.test(f));
+  if (files.some((f) => path.resolve(dir, f) === path.resolve(out))) fail(`--out would overwrite a module: ${out}`);
   const results = [];
   for (const f of files) {
     process.stderr.write(`analyzing ${f}...\n`);
@@ -189,21 +207,22 @@ if (args.includes("--corpus")) {
   fs.writeFileSync(out, JSON.stringify(results, null, 1));
   console.log(`wrote ${out} (${results.length} modules)`);
 } else {
-  const file = args.find((a) => !a.startsWith("--"));
-  if (!file) {
-    console.error("Usage: node tools/analyze.js <module> [--pattern N] [--json out.json] | --corpus <dir> [--out file]");
-    process.exit(1);
-  }
-  if (flag("--pattern") !== undefined) {
-    printPattern(file, parseInt(flag("--pattern")));
+  if (positionals.length !== 1) fail(USAGE);
+  const [file] = positionals;
+  if (flags.pattern !== undefined) {
+    if (!/^\d+$/.test(flags.pattern)) fail(`--pattern expects a pattern index, got ${flags.pattern}`);
+    printPattern(file, Number(flags.pattern));
   } else {
-    const info = analyzeModule(file, { dump: !!flag("--json") });
-    if (flag("--json")) {
-      fs.mkdirSync(path.dirname(flag("--json")), { recursive: true });
-      fs.writeFileSync(flag("--json"), JSON.stringify(info, null, 1));
+    const out = flags.json;
+    if (out !== undefined && path.resolve(out) === path.resolve(file)) fail(`--json would overwrite the module: ${out}`);
+    const info = analyzeModule(file, { dump: out !== undefined });
+    if (info.error) fail(`${file}: ${info.error}`);
+    if (out !== undefined) {
+      fs.mkdirSync(path.dirname(out), { recursive: true });
+      fs.writeFileSync(out, JSON.stringify(info, null, 1));
       const { patternData, ...rest } = info;
       console.log(JSON.stringify(rest, null, 2));
-      console.log(`full dump (incl. pattern data): ${flag("--json")}`);
+      console.log(`full dump (incl. pattern data): ${out}`);
     } else {
       console.log(JSON.stringify(info, null, 2));
     }

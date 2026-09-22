@@ -169,3 +169,57 @@ test('generators reproduce checked-in JSON without the optional sample library',
     }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+function compileSample(t, sample) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cozy-sample-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const input = path.join(dir, 'song.json'), output = path.join(dir, 'song.it');
+  fs.writeFileSync(input, JSON.stringify({ samples: [sample], patterns: [{ rows: 1, channels: [{}] }], order: [0] }));
+  const r = spawnSync(process.execPath, ['tools/json2it.js', input, output], { cwd: root, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  const b = fs.readFileSync(output);
+  const ptr = b.readUInt32LE(0xc0 + b.readUInt16LE(0x20) + b.readUInt16LE(0x22) * 4);
+  return { flags: b[ptr + 0x12], loop: [b.readUInt32LE(ptr + 0x34), b.readUInt32LE(ptr + 0x38)], c5speed: b.readUInt32LE(ptr + 0x3c) };
+}
+
+test('json2it applies detune to raw PCM samples and keeps synth loops', (t) => {
+  const raw = compileSample(t, { channels: [[0, 0.5, 0, -0.5]], samplerate: 8000, detune: 1200 });
+  assert.equal(raw.c5speed, 16000);
+  const synth = compileSample(t, { synth: { wave: 'noise', seconds: 0.1 }, loop: { start: 0, end: 1000 } });
+  assert.equal(synth.flags & 0x10, 0x10, 'loop flag');
+  assert.deepEqual(synth.loop, [0, 1000]);
+});
+
+test('json2it refuses to overwrite its input', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cozy-self-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const input = path.join(dir, 'song');
+  const source = JSON.stringify({ samples: [loop], patterns: [{ rows: 1, channels: [{}] }], order: [0] });
+  fs.writeFileSync(input, source);
+  const r = spawnSync(process.execPath, ['tools/json2it.js', input, input], { cwd: root, encoding: 'utf8' });
+  assert.equal(r.status, 1);
+  assert.equal(fs.readFileSync(input, 'utf8'), source);
+});
+
+test('writeSong only accepts *.gen.js generators', async () => {
+  const { writeSong } = await import('../songs/lib.js');
+  assert.throws(() => writeSong('file:///tmp/mysong.js', { patterns: [], order: [] }), /gen\.js/);
+});
+
+test('echo boundary cuts never replace an echoed event on the final row', () => {
+  const onset = echoChannel({ 60: { note: 'E-5', vol: 'v40', fx: 'J37' } }, { delay: 3, rows: 64 });
+  assert.deepEqual(onset[63], { note: 'E-5', vol: 'v20', fx: 'J37' });
+  const volumeOnly = echoChannel({ 0: note('C-5'), 60: { vol: 'v40' } }, { delay: 3, rows: 64 });
+  assert.deepEqual(volumeOnly[63], { vol: 'v20', note: '^^' });
+});
+
+test('validator rejects non-string text fields and unusable channel names', () => {
+  const base = { samples: [loop], patterns: [{ rows: 1, channels: [{}] }], order: [0] };
+  const errors = (extra) => validateSong({ ...base, ...extra }).join('\n');
+  assert.match(errors({ title: 2024 }), /title: expected a string/);
+  assert.match(errors({ message: ['x'] }), /message: expected a string/);
+  assert.match(errors({ message: 'x'.repeat(8001) }), /8000/);
+  assert.match(errors({ channelnames: {} }), /channelnames/);
+  assert.match(errors({ channelnames: { lead: 'x' } }), /channelnames/);
+  assert.equal(errors({ channelnames: ['kick', 'bass'] }), '');
+});

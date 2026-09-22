@@ -10,6 +10,16 @@ export function validateSong(song) {
   for (const [key, min, max] of [['bpm', 32, 255], ['ticks', 1, 255], ['mixvol', 0, 128]]) {
     if (song[key] !== undefined) check(integer(song[key], min, max), key, `expected integer ${min}..${max}`);
   }
+  for (const key of ['title', 'message']) {
+    if (song[key] !== undefined) check(typeof song[key] === 'string', key, 'expected a string');
+  }
+  if (typeof song.message === 'string') check(song.message.length <= 8000, 'message', 'expected at most 8000 characters (IT limit)');
+  if (song.channelnames !== undefined) {
+    const names = song.channelnames;
+    check((Array.isArray(names) || object(names)) && Object.keys(names).length > 0 &&
+      Object.entries(names).every(([k, v]) => /^(0|[1-9][0-9]?)$/.test(k) && Number(k) < 64 && (v == null || typeof v === 'string')),
+      'channelnames', 'expected strings for channels 0..63');
+  }
   if (!Array.isArray(song.samples) || !Array.isArray(song.patterns) || !Array.isArray(song.order)) {
     return [...errors, 'samples, patterns and order must be arrays'];
   }
@@ -23,6 +33,7 @@ export function validateSong(song) {
     check([s.synth, s.file, s.channels, s.buffer].filter(v => v !== undefined).length === 1,
       at, 'choose exactly one of synth, file, channels or buffer');
     if (s.file !== undefined) check(typeof s.file === 'string' && s.file.length > 0, at, 'file must be a path');
+    if (s.name !== undefined) check(typeof s.name === 'string', at, 'name must be a string');
     if (s.synth !== undefined) {
       check(object(s.synth), at, 'synth must be an object');
       if (object(s.synth)) {
@@ -57,6 +68,7 @@ export function validateSong(song) {
     const at = `patterns[${i}]`;
     if (!object(p) || !Array.isArray(p.channels)) { errors.push(`${at}: expected channels array`); return; }
     check(integer(p.rows, 1, 1024), at, 'rows must be 1..1024');
+    if (p.name !== undefined) check(typeof p.name === 'string', at, 'name must be a string');
     check(p.channels.length > 0 && p.channels.length <= 64, at, 'expected 1..64 channels');
     let packedBytes = p.rows;
     p.channels.forEach((ch, c) => {

@@ -86,7 +86,7 @@ test('browser sample resolution respects explicit synth volume, tuning and susta
   assert.deepEqual(sample.susloop, def.susloop);
 });
 
-function worklet({ invalidModule = false } = {}) {
+function worklet({ invalidModule = false, extra = {} } = {}) {
   let source = fs.readFileSync(new URL('../player/vendor/chiptune3/chiptune3.worklet.js', import.meta.url), 'utf8');
   // Run the actual processor methods with a fake WASM allocator and browser port.
   source = source.replace(/import libopenmptPromise from [^\n]+/, '')
@@ -104,17 +104,18 @@ function worklet({ invalidModule = false } = {}) {
     _openmpt_module_get_num_channels() { return 1; },
     _openmpt_module_set_repeat_count() {},
     _openmpt_module_set_render_param() {},
+    ...extra,
   };
   let Processor;
   const context = vm.createContext({
-    api, console,
+    api, console, sampleRate: 48000,
     AudioWorkletProcessor: class { constructor() { this.port = { postMessage() {} }; } },
     registerProcessor(_name, cls) { Processor = cls; },
   });
   vm.runInContext(source + ';libopenmpt = api;', context);
   const processor = new Processor();
   processor.meta = () => {};
-  return { processor, allocations, invalidFrees };
+  return { processor, allocations, invalidFrees, api };
 }
 
 test('loading, replacing and stopping modules releases all WASM sample buffers', () => {
@@ -218,7 +219,7 @@ function jukebox({ manualInitialization = false } = {}) {
   const drawing = new Proxy({}, { get: (_target, key) => key.startsWith('create') ? () => gradient : () => {} });
   const node = () => ({
     children: [], style: {}, dataset: {}, textContent: '', width: 0, height: 0,
-    classList: { toggle() {} }, addEventListener() {},
+    classList: { toggle() {} }, addEventListener() {}, setAttribute() {}, removeAttribute() {},
     appendChild(child) { this.children.push(child); },
     querySelector() { return node(); },
     getBoundingClientRect() { return { width: 10, height: 10 }; },
@@ -314,4 +315,158 @@ test('jukebox disposal during buffer decoding closes audio and prevents later re
   assert.deepEqual(instances[0].plays, []);
   assert.deepEqual(cancelledFrames, [1]);
   assert.equal(fetches.size, 1);
+});
+
+function fakeChiptune({ init = true, meta = true, error = null } = {}) {
+  const handlers = {};
+  const on = (name) => (cb) => { (handlers[name] ??= []).push(cb); };
+  const fire = (name, v) => (handlers[name] ?? []).forEach((cb) => cb(v));
+  const player = {
+    calls: [], closed: 0,
+    context: { state: 'running', close() { player.closed++; this.state = 'closed'; return Promise.resolve(); } },
+    onInitialized: on('onInitialized'), onMetadata: on('onMetadata'),
+    onProgress: on('onProgress'), onError: on('onError'),
+    play() { player.calls.push('play'); if (error) queueMicrotask(() => fire('onError', { type: error })); else if (meta) queueMicrotask(() => fire('onMetadata', {})); },
+    stop() { player.calls.push('stop'); },
+    setOrderRow(o, r) { player.calls.push(['seek', o, r]); },
+    setChannelMute() {},
+  };
+  if (init) queueMicrotask(() => fire('onInitialized'));
+  return player;
+}
+
+async function withFetch(routes, fn) {
+  const saved = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const body = routes[url];
+    if (body === undefined) return { ok: false, status: 404 };
+    return { ok: true, status: 200, json: async () => body, arrayBuffer: async () => new ArrayBuffer(8) };
+  };
+  try { return await fn(); } finally { globalThis.fetch = saved; }
+}
+
+const MANIFEST = { sections: { a: [0, 1], b: [2, 2] }, loop: 'a', layers: [{ name: 'x', channels: [0], above: 0 }] };
+
+test('adaptive create starts the loop section once the module is ready', async () => {
+  const player = fakeChiptune();
+  const music = await withFetch({ 'm.it': 'buf', 'm.json': MANIFEST }, () =>
+    CozyAdaptive.create('m.it', 'm.json', { createPlayer: () => player }));
+  assert.equal(music.section, 'a');
+  assert.deepEqual(player.calls.slice(0, 2), ['play', ['seek', 0, 0]]);
+  music.dispose();
+  assert.equal(player.closed, 1);
+});
+
+test('adaptive create rejects and closes audio on missing files, bad manifests, load errors and timeouts', async () => {
+  const cases = [
+    [{ 'm.json': MANIFEST }, {}, /m\.it: HTTP 404/],
+    [{ 'm.it': 'buf', 'm.json': { sections: { a: [2, 1] } } }, {}, /section a must be/],
+    [{ 'm.it': 'buf', 'm.json': { sections: { a: [0, 1] }, loop: 'z' } }, {}, /unknown section: z/],
+    [{ 'm.it': 'buf', 'm.json': MANIFEST }, { error: 'ptr' }, /module failed to load \(ptr\)/],
+    [{ 'm.it': 'buf', 'm.json': MANIFEST }, { init: false }, /audio worklet did not load within 20 ms/],
+    [{ 'm.it': 'buf', 'm.json': MANIFEST }, { meta: false }, /module did not load within 20 ms/],
+  ];
+  for (const [routes, behaviour, expected] of cases) {
+    const player = fakeChiptune(behaviour);
+    await assert.rejects(withFetch(routes, () =>
+      CozyAdaptive.create('m.it', 'm.json', { createPlayer: () => player, timeout: 20 })), expected);
+    assert.equal(player.closed, 1, String(expected));
+  }
+});
+
+test('a disposed adaptive player ignores late progress', () => {
+  const { music, progress, jumps } = adaptive({ loop: [1, 2] }, 'loop');
+  music.dispose = CozyAdaptive.prototype.dispose;
+  music.player.stop = () => {};
+  music.dispose();
+  progress(3);
+  assert.deepEqual(jumps, [[1, 0]]);
+});
+
+function stackAndStrings() {
+  const strings = new Set();
+  let sp = 60000, nextString = 30000;
+  const str = () => { const ptr = nextString++; strings.add(ptr); return ptr; };
+  return {
+    strings,
+    extra: {
+      HEAP8: new Int8Array(65536),
+      stackSave: () => sp,
+      stackRestore(v) { sp = v; },
+      stackAlloc(n) { sp -= n; return sp; },
+      _openmpt_module_ctl_set() {},
+      _openmpt_module_ext_get_interface() { return 0; },
+      UTF8ToString: () => 'x',
+      _openmpt_free_string(ptr) { assert.ok(strings.delete(ptr), `double or foreign free ${ptr}`); },
+      _openmpt_module_get_duration_seconds: () => 10,
+      _openmpt_module_get_metadata_keys: str,
+      _openmpt_module_get_metadata: str,
+      _openmpt_module_get_num_subsongs: () => 1,
+      _openmpt_module_get_subsong_name: str,
+      _openmpt_module_get_channel_name: str,
+      _openmpt_module_get_num_instruments: () => 1,
+      _openmpt_module_get_instrument_name: str,
+      _openmpt_module_get_num_samples: () => 2,
+      _openmpt_module_get_sample_name: str,
+      _openmpt_module_get_num_orders: () => 2,
+      _openmpt_module_get_order_name: str,
+      _openmpt_module_get_order_pattern: () => 0,
+      _openmpt_module_get_num_patterns: () => 1,
+      _openmpt_module_get_pattern_name: str,
+      _openmpt_module_get_pattern_num_rows: () => 2,
+      _openmpt_module_format_pattern_row_channel: str,
+    },
+    get sp() { return sp; },
+  };
+}
+
+test('tempo and pitch changes do not consume the WASM stack', () => {
+  const env = stackAndStrings();
+  const { processor } = worklet({ extra: env.extra });
+  processor.play(new ArrayBuffer(100));
+  const before = env.sp;
+  for (let i = 0; i < 5000; i++) {
+    processor.handleMessage_({ data: { cmd: i % 2 ? 'setTempo' : 'setPitch', val: 1 + i / 1e4 } });
+  }
+  assert.equal(env.sp, before);
+});
+
+test('module metadata frees every string libopenmpt returns', () => {
+  const env = stackAndStrings();
+  const { processor } = worklet({ extra: env.extra });
+  processor.play(new ArrayBuffer(100));
+  processor.getMeta();
+  assert.equal(env.strings.size, 0);
+});
+
+test('a finished module reports its end once', () => {
+  const posted = [];
+  const { processor } = worklet({ extra: { _openmpt_module_read_float_stereo: () => 0 } });
+  processor.play(new ArrayBuffer(100));
+  processor.port.postMessage = (m) => posted.push(m.cmd);
+  const out = [[new Float32Array(128), new Float32Array(128)]];
+  for (let i = 0; i < 10; i++) processor.process([], out, {});
+  assert.deepEqual(posted, ['end']);
+});
+
+test('jukebox recovers when the audio engine fails to start', async () => {
+  const { mounted, instances, finish } = jukebox({ manualInitialization: true });
+  const failed = mounted.playTrack(0); await flushTasks();
+  instances[0].error({ type: 'Init' }); await failed;
+  assert.equal(mounted.state, 'stopped');
+  assert.equal(instances[0].closed, true);
+  const retry = mounted.playTrack(0); await flushTasks();
+  instances[1].initialize(); await flushTasks();
+  finish('night_bus.it', 'retry'); await retry;
+  assert.deepEqual(instances[1].plays, ['retry']);
+});
+
+test('jukebox stops and reports a module the engine cannot read', async () => {
+  const { mounted, instances, finish, nodes } = jukebox();
+  const pending = mounted.playTrack(2); await flushTasks();
+  finish('first_light.it', 'junk'); await pending;
+  assert.equal(mounted.state, 'playing');
+  instances[0].error({ type: 'ptr' });
+  assert.equal(mounted.state, 'stopped');
+  assert.match(nodes.get('.jb-title').textContent, /could not play First Light \(ptr\)/);
 });

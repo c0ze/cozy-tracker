@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cozy-tracker — adaptive game music, generated</title>
-<meta name="description" content="Describe the mood — get an adaptive score that reacts to your game, in 30 kilobytes, cleared to ship.">
+<meta name="description" content="Describe the mood — get an adaptive score that reacts to your game, in kilobytes, not megabytes, cleared to ship.">
 <link rel="icon" href="assets/logo.png">
 <meta property="og:title" content="cozy-tracker">
 <meta property="og:description" content="Adaptive game music, generated. Describe the mood — get a score that reacts to your game.">
-<meta property="og:image" content="assets/banner.png">
+<meta property="og:image" content="https://tracker.coze.org/assets/banner.png">
 <style>
   :root {
     --bg:#0b0d12; --panel:#14171f; --panel2:#1b1f2b; --line:#2a3040;
@@ -90,7 +90,7 @@
     <h1>adaptive game music, generated</h1>
     <p class="tagline">Describe the mood — get a score that <b>reacts to your game</b>.</p>
     <p class="sub">One tiny module that layers, transitions, and re-scores itself in real time.
-      No stem stacks. No crossfade rigs. ~30&nbsp;KB, cleared to ship.</p>
+      No stem stacks. No crossfade rigs. Kilobytes, not megabytes, cleared to ship.</p>
     <div class="cta">
       <a class="btn primary" href="player/?song=../demos/night_bus.it">Open the tracker</a>
       <a class="btn" href="https://github.com/c0ze/cozy-tracker">GitHub</a>
@@ -123,7 +123,7 @@
       <div class="card"><div class="ic">⚖️</div><h3>Cleared to ship</h3>
         <p>Every sound traces to a public-domain or CC0 source in a provenance ledger. No sample-license landmines in your release.</p></div>
       <div class="card"><div class="ic">🪶</div><h3>Kilobytes, not megabytes</h3>
-        <p>An adaptive score is tens of KB. A five-stem rig is tens of MB. That gap decides whether your web or mobile game ships with music.</p></div>
+        <p>An adaptive score here is 15–290&nbsp;KB. A five-stem rig is tens of MB. That gap decides whether your web or mobile game ships with music.</p></div>
       <div class="card"><div class="ic">🧪</div><h3>Music QA, automated</h3>
         <p>A linter catches dissonance and register clashes before you hear them. Offline rendering + metering make a soundtrack you can regression-test.</p></div>
       <div class="card"><div class="ic">🧩</div><h3>Data-driven</h3>
@@ -148,12 +148,12 @@
              { <span class="str">"name"</span>:<span class="str">"lead"</span>,  <span class="str">"channels"</span>:[6,8],   <span class="str">"above"</span>:0.8  } ],
   <span class="str">"sections"</span>: { <span class="str">"explore"</span>:[7,8], <span class="str">"bridge"</span>:[9,9], <span class="str">"combat"</span>:[11,14], <span class="str">"boss"</span>:[16,17] },
   <span class="str">"loop"</span>: <span class="str">"explore"</span> }</pre>
-    <div class="tabs">
-      <span class="tab on" data-t="web">web</span>
-      <span class="tab" data-t="godot">godot</span>
-      <span class="tab" data-t="unity">unity</span>
+    <div class="tabs" role="tablist" aria-label="engine">
+      <button type="button" class="tab on" role="tab" aria-selected="true" aria-controls="snippet" data-t="web">web</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="snippet" data-t="godot">godot</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="snippet" data-t="unity">unity</button>
     </div>
-    <pre id="snippet"></pre>
+    <pre id="snippet" role="tabpanel"></pre>
   </div>
 </section>
 
@@ -209,7 +209,7 @@
 
 <section id="demos">
   <div class="wrap">
-    <h2><span class="k">Hear it</span>Five modules, all generated.</h2>
+    <h2><span class="k">Hear it</span>Six modules, all generated.</h2>
     <p class="lead">Every track was composed by the pipeline from public-domain samples, then rendered
       to a self-contained module. Open one in the browser player — pattern view, per-channel
       solo/mute, oscilloscope.</p>
@@ -226,7 +226,7 @@
 
 <footer>
   <div class="wrap">
-    <p><b style="color:var(--text)">cozy-tracker</b> — describe the mood, get an adaptive score that reacts to your game, in 30&nbsp;KB, cleared to ship.</p>
+    <p><b style="color:var(--text)">cozy-tracker</b> — describe the mood, get an adaptive score that reacts to your game, in kilobytes, cleared to ship.</p>
     <p>Playback via libopenmpt (BSD). Samples: AKWF &amp; Saga Musix (public-domain / free-use).
       <a href="https://github.com/c0ze/cozy-tracker">Source on GitHub</a> ·
       <a href="listen/">Listen</a> ·
@@ -252,14 +252,21 @@ music.<span class="fn">transition_to</span>(<span class="str">"combat"</span>)`,
   const snip = document.getElementById('snippet');
   const setSnip = (t) => { snip.innerHTML = SNIPPETS[t]; };
   document.querySelectorAll('.tab').forEach(el => el.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t === el));
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.toggle('on', t === el);
+      t.setAttribute('aria-selected', String(t === el));
+    });
     setSnip(el.dataset.t);
   }));
   setSnip('web');
 </script>
 <script type="module">
   import { mountJukebox } from './listen/jukebox.js';
-  mountJukebox(document.getElementById('jukebox'), { base: 'demos/', collapsedPlaylist: true });
+  // One audio source at a time: the adaptive demos listen for this and stop.
+  window.cozyJukebox = mountJukebox(document.getElementById('jukebox'), {
+    base: 'demos/', collapsedPlaylist: true,
+    onPlay: () => window.dispatchEvent(new Event('cozy:jukebox-play')),
+  });
 </script>
 <script type="module">
   import { CozyAdaptive } from './player/cozy-adaptive.js';
@@ -271,9 +278,15 @@ music.<span class="fn">transition_to</span>(<span class="str">"combat"</span>)`,
   const showCall = (line) => {
     codeEl.innerHTML = line;
   };
+  addEventListener('cozy:jukebox-play', () => {
+    if (music) $('dStop').click();
+    if (music2) $('bStop').click();
+  });
 
   $('dStart').addEventListener('click', async () => {
     if (music) return;
+    if (music2) $('bStop').click(); // one demo at a time
+    window.cozyJukebox?.stopAll();
     $('dStart').disabled = true;
     $('dState').textContent = 'loading…';
     try {
@@ -309,7 +322,7 @@ music.<span class="fn">transition_to</span>(<span class="str">"combat"</span>)`,
 
   $('dStop').addEventListener('click', () => {
     if (!music) return;
-    music.stop();
+    music.dispose();
     music = null;
     $('dControls').style.display = 'none';
     $('dStart').disabled = false;
@@ -323,6 +336,7 @@ music.<span class="fn">transition_to</span>(<span class="str">"combat"</span>)`,
   $('bStart').addEventListener('click', async () => {
     if (music2) return;
     if (music) $('dStop').click(); // one demo at a time
+    window.cozyJukebox?.stopAll();
     $('bStart').disabled = true;
     $('bState').textContent = 'loading…';
     try {
@@ -346,7 +360,7 @@ music.<span class="fn">transition_to</span>(<span class="str">"combat"</span>)`,
   });
   $('bStop').addEventListener('click', () => {
     if (!music2) return;
-    music2.stop();
+    music2.dispose();
     music2 = null;
     for (const id of ['bSiege', 'bNight', 'bStop']) $(id).style.display = 'none';
     $('bStart').disabled = false;

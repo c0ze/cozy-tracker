@@ -33,6 +33,18 @@ function asciiToStack(str) {
 	writeAsciiToMemory(str, stackStr)					// no longer in Emscripten, see below
 	return stackStr
 }
+// Scope stack strings: stackAlloc without stackRestore overflows the WASM stack.
+function ctlSet(modulePtr, key, value) {
+	const sp = libopenmpt.stackSave()
+	try { libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack(key), asciiToStack(value)) }
+	finally { libopenmpt.stackRestore(sp) }
+}
+// libopenmpt returns caller-owned strings; free each after copying it out.
+function takeString(ptr) {
+	const str = libopenmpt.UTF8ToString(ptr)
+	libopenmpt._openmpt_free_string(ptr)
+	return str
+}
 function writeAsciiToMemory(str,buffer,dontAddNull){for(let i=0;i<str.length;++i){libopenmpt.HEAP8[buffer++>>0]=str.charCodeAt(i)}if(!dontAddNull)libopenmpt.HEAP8[buffer>>0]=0}
 
 
@@ -68,6 +80,7 @@ class MPT extends AudioWorkletProcessor {
 			} else {
 				this.port.postMessage({cmd:'end'})
 			}
+			this.paused = true	// report once, not every render quantum; play/unpause restarts
 			return true
 		}
 
@@ -130,11 +143,11 @@ class MPT extends AudioWorkletProcessor {
 				break
 			case 'setPitch':
 				if (!libopenmpt.stackSave || !this.modulePtr) return
-				libopenmpt._openmpt_module_ctl_set(this.modulePtr, asciiToStack('play.pitch_factor'), asciiToStack(v.toString()))
+				ctlSet(this.modulePtr, 'play.pitch_factor', v.toString())
 				break
 			case 'setTempo':
 				if (!libopenmpt.stackSave || !this.modulePtr) return
-				libopenmpt._openmpt_module_ctl_set(this.modulePtr, asciiToStack('play.tempo_factor'), asciiToStack(v.toString()))
+				ctlSet(this.modulePtr, 'play.tempo_factor', v.toString())
 				break
 			case 'selectSubsong':
 				if (!this.modulePtr) return
@@ -218,15 +231,15 @@ class MPT extends AudioWorkletProcessor {
 
 		// interactive interface: struct of function pointers; slot 10 = set_channel_mute_status
 		this.setChannelMuteFn = null
-		try {
-			const stack = libopenmpt.stackSave()
+		const ifaceStack = libopenmpt.stackSave?.()
+		if (ifaceStack !== undefined) try {
 			const ifaceBuf = libopenmpt.stackAlloc(64)
 			if (libopenmpt._openmpt_module_ext_get_interface(this.extPtr, asciiToStack('interactive'), ifaceBuf, 64)) {
 				const dv = new DataView(libopenmpt.HEAPU8.buffer, ifaceBuf, 64)
 				this.setChannelMuteFn = libopenmpt.wasmTable.get(dv.getUint32(10 * 4, true))
 			}
-			libopenmpt.stackRestore(stack)
 		} catch (e) { /* mute unavailable in this build */ }
+		finally { libopenmpt.stackRestore(ifaceStack) }
 
 		if (libopenmpt.stackSave) {
 			const stack = libopenmpt.stackSave()
@@ -289,27 +302,27 @@ class MPT extends AudioWorkletProcessor {
 		const chNum = libopenmpt._openmpt_module_get_num_channels(this.modulePtr)
 		this.channel = chNum
 		for (let i = 0; i < chNum; i++) {
-			song.channels.push( libopenmpt.UTF8ToString(libopenmpt._openmpt_module_get_channel_name(this.modulePtr, i)) )
+			song.channels.push( takeString(libopenmpt._openmpt_module_get_channel_name(this.modulePtr, i)) )
 		}
 		// instruments
 		for (let i = 0, e = libopenmpt._openmpt_module_get_num_instruments(this.modulePtr); i < e; i++) {
-			song.instruments.push( libopenmpt.UTF8ToString(libopenmpt._openmpt_module_get_instrument_name(this.modulePtr, i)) )
+			song.instruments.push( takeString(libopenmpt._openmpt_module_get_instrument_name(this.modulePtr, i)) )
 		}
 		// samples
 		for (let i = 0, e = libopenmpt._openmpt_module_get_num_samples(this.modulePtr); i < e; i++) {
-			song.samples.push( libopenmpt.UTF8ToString(libopenmpt._openmpt_module_get_sample_name(this.modulePtr, i)) )
+			song.samples.push( takeString(libopenmpt._openmpt_module_get_sample_name(this.modulePtr, i)) )
 		}
 		// orders
 		for (let i = 0, e = libopenmpt._openmpt_module_get_num_orders(this.modulePtr); i < e; i++) {
 			song.orders.push( {
-				name: libopenmpt.UTF8ToString(libopenmpt._openmpt_module_get_order_name(this.modulePtr, i)),
+				name: takeString(libopenmpt._openmpt_module_get_order_name(this.modulePtr, i)),
 				pat: libopenmpt._openmpt_module_get_order_pattern(this.modulePtr, i),
 			})
 		}
 		// patterns — cells as formatted tracker strings "C-5 01 v40 J37" (13 wide)
 		for (let patIdx = 0, patNum = libopenmpt._openmpt_module_get_num_patterns(this.modulePtr); patIdx < patNum; patIdx++) {
 			const pattern = {
-				name: libopenmpt.UTF8ToString(libopenmpt._openmpt_module_get_pattern_name(this.modulePtr, patIdx)),
+				name: takeString(libopenmpt._openmpt_module_get_pattern_name(this.modulePtr, patIdx)),
 				rows: [],
 			}
 			// rows
@@ -338,11 +351,11 @@ class MPT extends AudioWorkletProcessor {
 			// looks like an error occured reading the mod
 			this.port.postMessage({cmd:'err',val:'dur'})
 		}
-		const keys = libopenmpt.UTF8ToString(libopenmpt._openmpt_module_get_metadata_keys(this.modulePtr)).split(';')
+		const keys = takeString(libopenmpt._openmpt_module_get_metadata_keys(this.modulePtr)).split(';')
 		for (let i = 0; i < keys.length; i++) {
 			const keyNameBuffer = libopenmpt._malloc(keys[i].length + 1)
 			writeAsciiToMemory(keys[i], keyNameBuffer)
-			data[keys[i]] = libopenmpt.UTF8ToString(libopenmpt._openmpt_module_get_metadata(this.modulePtr, keyNameBuffer))
+			data[keys[i]] = takeString(libopenmpt._openmpt_module_get_metadata(this.modulePtr, keyNameBuffer))
 			libopenmpt._free(keyNameBuffer)
 		}
 		data.song = this.getSong()

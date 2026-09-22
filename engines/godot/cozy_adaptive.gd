@@ -43,12 +43,21 @@ static func create(parent: Node, module_path: String, manifest_path: String) -> 
 	return ca
 
 
-func load_module(module_path: String, manifest_path: String) -> void:
-	manifest = JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
-	assert(manifest is Dictionary and manifest.has("sections"), "invalid .cozy.json manifest")
+## Returns false (with push_error) when the manifest or module cannot load.
+## Validation uses push_error rather than assert, which release exports strip.
+func load_module(module_path: String, manifest_path: String) -> bool:
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
+	if not _valid_manifest(parsed):
+		push_error("CozyAdaptive: invalid .cozy.json manifest: " + manifest_path)
+		return false
+	var data := FileAccess.get_file_as_bytes(module_path)
+	if data.is_empty():
+		push_error("CozyAdaptive: cannot read module: " + module_path)
+		return false
+	manifest = parsed
 
 	var stream := AudioStreamMPT.new()
-	stream.set_data(FileAccess.get_file_as_bytes(module_path))
+	stream.set_data(data)
 	stream.loop_mode = AudioStreamMPT.LOOP_ENABLED
 
 	player = AudioStreamPlayer.new()
@@ -57,9 +66,26 @@ func load_module(module_path: String, manifest_path: String) -> void:
 	player.play()
 	_playback = player.get_stream_playback()
 
-	var start: String = manifest.get("loop", (manifest["sections"] as Dictionary).keys().front())
+	var sections: Dictionary = manifest["sections"]
+	var start: String = manifest.get("loop", sections.keys().front())
 	_jump(start)
 	set_intensity(intensity)
+	return true
+
+
+func _valid_manifest(m) -> bool:
+	if not (m is Dictionary) or not (m.get("sections") is Dictionary) or m["sections"].is_empty():
+		return false
+	for sec in m["sections"]:
+		var r = m["sections"][sec]
+		if not (r is Array) or r.size() != 2 or int(r[0]) < 0 or int(r[1]) < int(r[0]):
+			return false
+	if m.has("loop") and not m["sections"].has(m["loop"]):
+		return false
+	for layer in m.get("layers", []):
+		if not (layer is Dictionary) or not (layer.get("channels") is Array):
+			return false
+	return true
 
 
 ## 0..1 — layers with `above` greater than this are muted.
@@ -85,25 +111,30 @@ func active_layers() -> Array:
 ## Move to a named section at the next pattern boundary.
 ## Pass a `via` section (e.g. "bridge") to route through it once on the way.
 func transition_to(section_name: String, via: String = "", now: bool = false) -> void:
-	assert(manifest["sections"].has(section_name), "unknown section: " + section_name)
-	if via != "":
-		assert(manifest["sections"].has(via), "unknown section: " + via)
-		_queue = [via, section_name]
-	else:
-		_queue = [section_name]
+	if _playback == null:
+		push_error("CozyAdaptive: no module loaded")
+		return
+	for sec in [section_name, via]:
+		if sec != "" and not manifest["sections"].has(sec):
+			push_error("CozyAdaptive: unknown section: " + sec)
+			return
+	_queue = [via, section_name] if via != "" else [section_name]
 	_next_boundary = true
 	if now or not player.playing:
 		_advance()
 
 
 func pause() -> void:
-	player.stream_paused = true
+	if player:
+		player.stream_paused = true
 
 func resume() -> void:
-	player.stream_paused = false
+	if player:
+		player.stream_paused = false
 
 func set_volume_db(db: float) -> void:
-	player.volume_db = db
+	if player:
+		player.volume_db = db
 
 
 func _range_of(section_name: String) -> Array:

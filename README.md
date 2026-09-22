@@ -31,7 +31,7 @@ songs/*.json ─→ tools/json2it.js ─→ build/*.it (+ *.cozy.json manifest)
 ```sh
 npm install
 node tools/json2it.js songs/demo.json   # → build/demo.it
-python3 tools/serve.py 8123             # no-cache dev server, project root
+python3 tools/serve.py 8123             # no-cache dev server, project root, localhost only
 open http://localhost:8123/player/      # load ../build/demo.it, press Load
 ```
 
@@ -75,8 +75,9 @@ volumes or `mixvol` when balancing notes that already stamp their volume.
 - `player/` — browser tracker: pattern view with playhead, VU meters, oscilloscope,
   per-channel **solo/mute** (engine-level, via libopenmpt's ext interface),
   and an **edit mode** for `.json` songs (piano-roll keyboard with audition,
-  instrument add/remove, in-browser itwriter compile, ⬇ json/.it export). Space = pause/resume; in edit
-  mode space (re)plays the selected pattern. Keys: z s x d c v g b h n j m = C..B,
+  instrument add/remove, in-browser itwriter compile, ⬇ json/.it export). Space = pause/resume; with unsaved
+  edits in edit mode, Space recompiles and plays the selected pattern. ▶ after ■ replays
+  the loaded song, edits included. Wide songs scroll sideways (wheel/drag). Keys: z s x d c v g b h n j m = C..B,
   q 2 w 3 e … = octave up, i 9 o 0 p = two up, a = note off, Delete = remove,
   arrows/PgUp/PgDn = cursor, [ ] = octave, click = place cursor.
   `player/vendor/chiptune3/` is vendored [chiptune3](https://github.com/DrSnuggles/chiptune)
@@ -136,7 +137,10 @@ music.transitionTo('combat', { via: 'bridge' });  // jump at the next pattern bo
 
 Sections loop themselves until a transition is requested. Requests are handled
 at observed pattern boundaries; main-thread scheduling can delay a seek, so
-section transitions are approximate and should be auditioned in context. Live demo on the
+section transitions are approximate and should be auditioned in context.
+`create()` rejects (rather than hanging) if the worklet, manifest or module
+fails to load or times out (`{ timeout: 15000 }` by default); call
+`music.dispose()` when finished to release the AudioContext. Live demo on the
 landing page ([index.html](index.html)). See
 [docs/positioning.md](docs/positioning.md) for the why.
 

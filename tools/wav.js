@@ -10,20 +10,27 @@ export function readWav(buffer) {
   const tag = (off) => String.fromCharCode(view.getUint8(off), view.getUint8(off + 1), view.getUint8(off + 2), view.getUint8(off + 3));
 
   if (view.byteLength < 12 || tag(0) !== "RIFF" || tag(8) !== "WAVE") throw new Error("Not a WAV file");
-  const riffEnd = view.getUint32(4, true) + 8;
+  const STREAMED = 0xffffffff; // size marker written by recorders that never seek back
+  const riffSize = view.getUint32(4, true);
+  const riffEnd = riffSize === STREAMED ? view.byteLength : riffSize + 8;
   if (riffEnd < 12 || riffEnd > view.byteLength) throw new Error("Truncated WAV RIFF container");
 
   let fmt = null;
   let dataOff = -1;
   let dataLen = 0;
+  let streamedData = false;
 
   let off = 12;
   // Some tracker-exported packs have a stale RIFF size after adding metadata.
   // Keep accepting these files, while bounding every chunk by the actual input.
   while (off + 8 <= view.byteLength) {
     const id = tag(off);
-    const size = view.getUint32(off + 4, true);
-    if (off + 8 + size > view.byteLength) throw new Error(`Truncated WAV ${id} chunk`);
+    let size = view.getUint32(off + 4, true);
+    if (off + 8 + size > view.byteLength) {
+      if (id === "data" && size === STREAMED) { size = view.byteLength - off - 8; streamedData = true; } // runs to EOF
+      else if (dataOff >= 0 && id !== "data") break; // damaged trailing metadata after complete audio
+      else throw new Error(`Truncated WAV ${id} chunk`);
+    }
     if (id === "fmt ") {
       if (size < 16) throw new Error("Truncated WAV fmt chunk");
       fmt = {
@@ -65,6 +72,7 @@ export function readWav(buffer) {
 
   const bytesPer = fmt.bitsPerSample / 8;
   const frameSize = bytesPer * fmt.numChannels;
+  if (streamedData) dataLen -= dataLen % frameSize; // a stream may stop mid-frame
   if (fmt.blockAlign !== frameSize || dataLen % frameSize !== 0) throw new Error("Invalid WAV frame alignment");
   const frames = dataLen / frameSize;
   const channels = Array.from({ length: fmt.numChannels }, () => new Array(frames));

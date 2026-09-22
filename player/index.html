@@ -65,22 +65,22 @@
   <button id="pause" title="pause (space)">⏸</button>
   <button id="stop" title="stop">■</button>
   <button id="edit" title="toggle edit mode (json songs only)">✎ edit</button>
-  <input type="range" id="seek" min="0" max="100" step="0.1" value="0" style="flex:2; min-width:100px">
-  <label>vol</label><input type="range" id="vol" min="0" max="1.5" step="0.01" value="1" style="width:60px">
-  <label>tempo</label><input type="range" id="tempo" min="0.5" max="2" step="0.05" value="1" style="width:60px">
-  <label>pitch</label><input type="range" id="pitch" min="0.5" max="2" step="0.05" value="1" style="width:60px">
-  <input type="text" id="url" value="../songs/first_light.json" style="flex:1; min-width:150px">
+  <input type="range" id="seek" aria-label="seek" min="0" max="100" step="0.1" value="0" style="flex:2; min-width:100px">
+  <label for="vol">vol</label><input type="range" id="vol" min="0" max="1.5" step="0.01" value="1" style="width:60px">
+  <label for="tempo">tempo</label><input type="range" id="tempo" min="0.5" max="2" step="0.05" value="1" style="width:60px">
+  <label for="pitch">pitch</label><input type="range" id="pitch" min="0.5" max="2" step="0.05" value="1" style="width:60px">
+  <input type="text" id="url" aria-label="song URL (.it or .json)" value="../songs/lantern_walk.json" style="flex:1; min-width:150px">
   <button id="loadUrl">Load</button>
-  <input type="file" id="file" accept=".it,.xm,.mod,.s3m,.json" style="font-size:11px; max-width:180px">
+  <input type="file" id="file" aria-label="open module or json song" accept=".it,.xm,.mod,.s3m,.json" style="font-size:11px; max-width:180px">
 </div>
 
 <div class="panel row" id="instBar">
-  <label>instrument</label>
+  <label for="instSel">instrument</label>
   <select id="instSel" style="min-width:180px"></select>
-  <input type="text" id="instPath" placeholder="library/samples/….wav" style="flex:1; min-width:160px">
+  <input type="text" id="instPath" aria-label="sample path" placeholder="library/samples/….wav" style="flex:1; min-width:160px">
   <label><input type="checkbox" id="instLoop" checked> single-cycle loop</label>
   <button id="instAdd">+ add</button>
-  <input type="file" id="instFile" accept=".wav" style="font-size:11px; max-width:160px">
+  <input type="file" id="instFile" aria-label="add wav instrument" accept=".wav" style="font-size:11px; max-width:160px">
   <button id="instDel">✕ remove</button>
   <span style="flex:1"></span>
   <button id="dlJson">⬇ json</button>
@@ -90,10 +90,10 @@
 <div class="panel"><div id="order"></div></div>
 <canvas id="scope"></canvas>
 <div id="patwrap">
-  <canvas id="pat"></canvas>
+  <canvas id="pat" aria-label="pattern view; scroll sideways or drag to see more channels"></canvas>
   <div id="drop">drop a module</div>
 </div>
-<div class="panel" id="meta">no module loaded — Load a URL (.it to view, .json to edit) or drop a file</div>
+<div class="panel" id="meta" aria-live="polite">no module loaded — Load a URL (.it to view, .json to edit) or drop a file</div>
 
 <script type="module">
 import { ChiptuneJsPlayer } from './vendor/chiptune3/chiptune3.js';
@@ -105,7 +105,9 @@ const $ = (id) => document.getElementById(id);
 const MIDDLE_C = 261.6256;
 
 // ---------- player state ----------
-let player = null, ready = false, started = false, paused = false, seeking = false;
+let player = null, playerReady = null, started = false, paused = false, seeking = false;
+let lastModule = null;    // { url } or { buf } of the last non-JSON module, for ▶ after ■
+let chScroll = 0;         // first visible channel when the pattern is wider than the view
 let song = null;          // worklet meta.song: channels[], patterns[{rows:[[cellStr,…]]}], orders[]
 let orders = [];
 let cur = { order: 0, pattern: 0, row: 0, pos: 0 };
@@ -136,17 +138,21 @@ const chColor = (i, l = 65, a = 1) => `hsla(${hue(i)}, 75%, ${l}%, ${a})`;
 const fmt = (s) => (s === undefined || isNaN(s)) ? '--:--' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 function initPlayer() {
-  player = new ChiptuneJsPlayer({ repeatCount: -1 });
+  const created = player = new ChiptuneJsPlayer({ repeatCount: -1 });
   window.__player = player; // debug handle
+  playerReady = new Promise((resolve, reject) => {
+    player.onInitialized(resolve);
+    player.onError((e) => { if (e?.type === 'Init') reject(new Error('audio engine failed to start')); });
+  });
+  playerReady.catch(() => { if (player === created) { player = null; playerReady = null; } created.context.close().catch(() => {}); });
   player.onInitialized(() => {
-    ready = true;
     if (player.processNode) player.processNode.onprocessorerror = (e) => console.error('worklet processor died', e);
     analyser = player.context.createAnalyser();
     analyser.fftSize = 2048;
     scopeData = new Float32Array(analyser.fftSize);
     player.gain.connect(analyser);
   });
-  player.onError((e) => { $('meta').textContent = 'error: ' + JSON.stringify(e); });
+  player.onError((e) => { $('meta').textContent = 'error: ' + (e?.type === 'ptr' ? 'not a playable module' : e?.type ?? 'unknown'); });
   player.onMetadata((meta) => {
     song = meta.song || {};
     orders = (song.orders || []).map((o) => o.pat);
@@ -266,6 +272,20 @@ function viewPattern() {
 }
 const playing = () => started && !paused;
 
+// Channels keep a readable minimum width; wider songs scroll sideways.
+function channelView(w, nCh) {
+  const { rowNumW } = LAYOUT;
+  const chW = Math.max(112, (w - rowNumW - 8) / nCh);
+  const visible = Math.max(1, Math.floor((w - rowNumW) / chW));
+  const maxFirst = Math.max(0, nCh - visible);
+  if (editMode) { // keep the edit cursor on screen
+    if (cursor.ch < chScroll) chScroll = cursor.ch;
+    if (cursor.ch >= chScroll + visible) chScroll = cursor.ch - visible + 1;
+  }
+  chScroll = Math.max(0, Math.min(maxFirst, Math.round(chScroll)));
+  return { chW, first: chScroll, visible, maxFirst };
+}
+
 function drawPattern() {
   const { w, h, dpr } = fitCanvas(patC);
   const ctx = patC.getContext('2d');
@@ -277,7 +297,7 @@ function drawPattern() {
   const pat = song.patterns[patIdx];
   const nCh = (song.channels || []).length;
   const { rowH, headH, rowNumW } = LAYOUT;
-  const chW = Math.max(112, (w - rowNumW - 8) / nCh);
+  const { chW, first, visible, maxFirst } = channelView(w, nCh);
 
   const target = (editMode && !playing()) ? cursor.row : cur.row;
   dispRow += (target - dispRow) * 0.35;
@@ -287,8 +307,13 @@ function drawPattern() {
 
   const img = patternCanvas(patIdx, chW, nCh, dpr);
   const srcY = (dispRow * rowH + rowH / 2) * dpr - (centerY - headH) * dpr;
+  const bodyH = (h - headH) * dpr;
+  const numW = Math.round(rowNumW * dpr);
+  const srcX = Math.round((rowNumW + first * chW) * dpr);
+  const srcW = Math.min(img.width - srcX, Math.round((w - rowNumW) * dpr));
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(img, 0, srcY, img.width, (h - headH) * dpr, 0, headH * dpr, img.width, (h - headH) * dpr);
+  ctx.drawImage(img, 0, srcY, numW, bodyH, 0, headH * dpr, numW, bodyH);
+  if (srcW > 0) ctx.drawImage(img, srcX, srcY, srcW, bodyH, numW, headH * dpr, srcW, bodyH);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   // playhead band
@@ -307,7 +332,7 @@ function drawPattern() {
   // edit cursor cell
   if (editMode) {
     const cy = centerY + (cursor.row - dispRow) * rowH;
-    const cx = rowNumW + cursor.ch * chW;
+    const cx = rowNumW + (cursor.ch - first) * chW;
     ctx.strokeStyle = 'rgba(224,164,88,.95)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(cx + 2, cy - rowH / 2 + 1, chW - 6, rowH - 2);
@@ -318,8 +343,8 @@ function drawPattern() {
   ctx.fillRect(0, 0, w, headH);
   ctx.strokeStyle = 'rgba(255,255,255,.08)';
   ctx.beginPath(); ctx.moveTo(0, headH - .5); ctx.lineTo(w, headH - .5); ctx.stroke();
-  for (let c = 0; c < nCh; c++) {
-    const x = rowNumW + c * chW + 6;
+  for (let c = first; c < Math.min(nCh, first + visible + 1); c++) {
+    const x = rowNumW + (c - first) * chW + 6;
     const muted = effMuted(c);
     const level = vu[c] ? Math.min(1, (vu[c].left + vu[c].right) / 1.6) : 0;
     vuDisp[c] = Math.max(level, (vuDisp[c] || 0) * 0.88);
@@ -342,6 +367,15 @@ function drawPattern() {
       ctx.font = `bold 9px ui-monospace, Menlo, monospace`;
       ctx.fillText(label, bx + 3.5, 15);
     }
+  }
+  ctx.fillStyle = '#11141c'; // mask a partly visible channel under the row numbers
+  ctx.fillRect(0, 0, rowNumW, headH);
+  if (maxFirst > 0) { // horizontal scroll indicator
+    const trackW = w - rowNumW;
+    ctx.fillStyle = 'rgba(255,255,255,.06)';
+    ctx.fillRect(rowNumW, h - 4, trackW, 4);
+    ctx.fillStyle = 'rgba(79,193,255,.7)';
+    ctx.fillRect(rowNumW + trackW * first / nCh, h - 4, trackW * visible / nCh, 4);
   }
 }
 
@@ -374,8 +408,12 @@ async function resolveSample(def) {
   let s;
   if (def.synth) {
     s = { name: def.name, ...synthesize(def.synth) };
+    if (def.loop) s.loop = def.loop;
   } else if (def.file) {
-    const resp = await fetch('/' + def.file);
+    // Sample paths are site-relative; never let a song JSON point at another host.
+    const url = new URL(def.file.replace(/^\/+/, ''), location.origin + '/');
+    if (url.origin !== location.origin) throw new Error(`sample outside this site: ${def.file}`);
+    const resp = await fetch(url);
     if (!resp.ok) throw new Error(`fetch failed: ${def.file}`);
     const wav = readWav(new Uint8Array(await resp.arrayBuffer()));
     s = { name: def.name || def.file.split('/').pop(), ...wav };
@@ -590,8 +628,10 @@ $('instAdd').onclick = () => {
 };
 $('instFile').onchange = async (e) => {
   const f = e.target.files[0];
-  if (!f) return;
-  const wav = readWav(new Uint8Array(await f.arrayBuffer()));
+  if (!f || !edit) return;
+  let wav;
+  try { wav = readWav(new Uint8Array(await f.arrayBuffer())); }
+  catch (err) { $('meta').textContent = `instrument error: ${f.name}: ${err.message}`; e.target.value = ''; return; }
   const def = { name: f.name.replace(/\.wav$/i, ''), samplerate: wav.samplerate, channels: wav.channels, volume: $('instLoop').checked ? 32 : 48 };
   if ($('instLoop').checked) {
     const n = wav.channels[0].length;
@@ -609,78 +649,97 @@ $('dlJson').onclick = () => {
 };
 $('dlIt').onclick = async () => {
   if (!edit) return;
-  download(new Blob([await compileIt()]), (edit.json.title || 'song').replace(/\W+/g, '_') + '.it');
+  await guard((async () => download(new Blob([await compileIt()]), (edit.json.title || 'song').replace(/\W+/g, '_') + '.it'))());
 };
 function download(blob, name) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000); // some browsers cancel an immediately revoked download
 }
 
 // ---------- loading ----------
 async function ensurePlayer() {
   if (!window.isSecureContext || !('audioWorklet' in (window.AudioContext?.prototype ?? {}))) {
     $('meta').innerHTML = `⚠ audio needs HTTPS — try <a href="https://${location.host}${location.pathname}">https://${location.host}</a>`;
-    throw new Error('secure context required for AudioWorklet');
+    throw Object.assign(new Error('secure context required for AudioWorklet'), { shown: true });
   }
   if (!player) initPlayer();
   if (player.context.state === 'suspended') await player.context.resume();
-  while (!ready) await new Promise((r) => setTimeout(r, 30));
+  await playerReady;
+}
+// Report failures in #meta instead of leaving the UI silently stuck.
+const guard = (promise) => Promise.resolve(promise).catch((e) => {
+  if (!e?.shown) $('meta').textContent = 'error: ' + (e?.message ?? e);
+});
+async function fetchOk(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  return res;
 }
 async function loadJsonSong(json, url) {
+  await ensurePlayer();
+  const previous = { edit, curInst };
   edit = { json, url, dirty: false };
+  curInst = 0;
+  let module;
+  try { module = await compileIt(); }
+  catch (e) { ({ edit, curInst } = previous); throw e; } // keep editing what is playing
   cursor = { row: 0, ch: 0 };
   selOrder = 0;
-  curInst = 0;
-  await ensurePlayer();
-  player.play(await compileIt());
-  edit.dirty = false;
+  chScroll = 0;
+  lastModule = null;
+  player.play(module);
   started = true; paused = false;
   refreshInstruments();
   updateEditState();
 }
+const confirmDiscard = () => !edit?.dirty || confirm('Discard unsaved edits?');
 async function loadUrl(url) {
-  if (url.endsWith('.json')) {
-    const j = await (await fetch(url)).json();
-    return loadJsonSong(j, url);
-  }
-  edit = null; editMode = false;
-  await ensurePlayer();
-  player.load(url);
-  started = true; paused = false;
-  updateEditState();
+  if (!url) return;
+  if (/\.json$/i.test(url)) return loadJsonSong(await (await fetchOk(url)).json(), url);
+  return loadBuffer(await (await fetchOk(url)).arrayBuffer(), url);
 }
 async function loadBuffer(buf, name = '') {
-  if (name.endsWith('.json')) return loadJsonSong(JSON.parse(new TextDecoder().decode(buf)), name);
-  edit = null; editMode = false;
+  if (/\.json$/i.test(name)) return loadJsonSong(JSON.parse(new TextDecoder().decode(buf)), name);
   await ensurePlayer();
+  edit = null; editMode = false; chScroll = 0;
+  lastModule = { buf };
   player.play(buf);
   started = true; paused = false;
   updateEditState();
 }
-$('loadUrl').onclick = () => loadUrl($('url').value);
-$('file').onchange = async (e) => { const f = e.target.files[0]; if (f) loadBuffer(await f.arrayBuffer(), f.name); };
+// ▶ after ■ replays what is loaded (including unsaved edits); it only
+// fetches the URL box when nothing has been loaded yet.
+async function startPlayback() {
+  if (edit) return playFromSelection();
+  if (lastModule) { await ensurePlayer(); player.play(lastModule.buf); started = true; paused = false; return; }
+  return loadUrl($('url').value);
+}
+$('loadUrl').onclick = () => { if (confirmDiscard()) guard(loadUrl($('url').value)); };
+$('file').onchange = async (e) => { const f = e.target.files[0]; if (f && confirmDiscard()) guard(loadBuffer(await f.arrayBuffer(), f.name)); };
+addEventListener('beforeunload', (e) => { if (edit?.dirty) e.preventDefault(); });
 const drop = $('drop');
 addEventListener('dragover', (e) => { e.preventDefault(); drop.style.display = 'flex'; });
 addEventListener('dragleave', (e) => { if (!e.relatedTarget) drop.style.display = 'none'; });
 addEventListener('drop', async (e) => {
   e.preventDefault(); drop.style.display = 'none';
   const f = e.dataTransfer.files[0];
-  if (f) loadBuffer(await f.arrayBuffer(), f.name);
+  if (f && confirmDiscard()) guard(loadBuffer(await f.arrayBuffer(), f.name));
 });
 
 // ---------- transport ----------
 async function playFromSelection() {
   // (re)compile if edited, then play the selected order slot from the top
+  await ensurePlayer();
   if (edit && edit.dirty) {
     player.play(await compileIt());
     edit.dirty = false;
     updateEditState();
   } else if (!started) {
-    if (edit) player.play(await compileIt());
-    else return loadUrl($('url').value);
+    if (!edit) return startPlayback();
+    player.play(await compileIt());
   }
   started = true; paused = false;
   player.setOrderRow(selOrder, 0);
@@ -688,8 +747,8 @@ async function playFromSelection() {
 function doPause() { if (started && !paused) { player.pause(); paused = true; } }
 function doResume() { if (started && paused) { player.unpause(); paused = false; } }
 
-$('play').onclick = async () => {
-  if (!started) return editMode && edit ? playFromSelection() : loadUrl($('url').value);
+$('play').onclick = () => {
+  if (!started) return guard(startPlayback());
   if (paused) doResume();
 };
 $('pause').onclick = () => { paused ? doResume() : doPause(); };
@@ -718,21 +777,22 @@ patC.addEventListener('mousedown', (e) => {
   const x = e.clientX - r.left, y = e.clientY - r.top;
   const { rowH, headH, rowNumW } = LAYOUT;
   const nCh = (song.channels || []).length;
-  const chW = Math.max(112, (r.width - rowNumW - 8) / nCh);
+  const { chW, first } = channelView(r.width, nCh);
+  const colAt = (px) => px < rowNumW ? -1 : first + Math.floor((px - rowNumW) / chW);
   if (y < headH) {
-    const c = Math.floor((x - rowNumW) / chW);
+    const c = colAt(x);
     if (c < 0 || c >= nCh) return;
-    const relX = x - (rowNumW + c * chW + 6);
+    const relX = x - (rowNumW + (c - first) * chW + 6);
     if (y >= 4 && y <= 18) {
       if (relX >= chW - 44 && relX < chW - 31) return toggleMute(c);
       if (relX >= chW - 28 && relX < chW - 15) return toggleSolo(c);
     }
     return;
   }
-  if (!editMode) return;
+  if (!editMode) { dragX = { x: e.clientX, first, chW }; return; }
   const centerY = headH + (r.height - headH) / 2;
   const row = Math.round(dispRow + (y - centerY) / rowH);
-  const ch = Math.floor((x - rowNumW) / chW);
+  const ch = colAt(x);
   const pat = song.patterns[viewPattern()];
   if (row >= 0 && row < pat.rows.length && ch >= 0 && ch < nCh) {
     const chChanged = ch !== cursor.ch;
@@ -740,6 +800,27 @@ patC.addEventListener('mousedown', (e) => {
     if (chChanged) syncInstToChannel();
   }
 });
+
+// sideways channel scrolling: wheel/trackpad, or drag outside edit mode
+let dragX = null;
+addEventListener('mousemove', (e) => { if (dragX) chScroll = dragX.first - (e.clientX - dragX.x) / dragX.chW; });
+addEventListener('mouseup', () => { dragX = null; });
+patC.addEventListener('wheel', (e) => {
+  const dx = e.shiftKey ? e.deltaY : e.deltaX;
+  if (!dx || editMode) return;
+  e.preventDefault();
+  wheelX += dx; // trackpads send many small deltas; step one channel per ~60px
+  if (Math.abs(wheelX) >= 60) { chScroll += Math.trunc(wheelX / 60); wheelX %= 60; }
+}, { passive: false });
+let wheelX = 0;
+let touchX = null;
+patC.addEventListener('touchstart', (e) => { if (!editMode) touchX = { x: e.touches[0].clientX, first: chScroll }; }, { passive: true });
+patC.addEventListener('touchmove', (e) => {
+  if (!touchX || !song) return;
+  const nCh = (song.channels || []).length;
+  chScroll = touchX.first - (e.touches[0].clientX - touchX.x) / channelView(patC.getBoundingClientRect().width, nCh).chW;
+}, { passive: true });
+patC.addEventListener('touchend', () => { touchX = null; });
 
 // ---------- keyboard ----------
 addEventListener('keydown', async (e) => {
@@ -752,9 +833,9 @@ addEventListener('keydown', async (e) => {
 
   if (e.code === 'Space') {
     e.preventDefault();
-    if (!started) { editMode && edit ? await playFromSelection() : (edit ? await playFromSelection() : $('url').value && loadUrl($('url').value)); return; }
-    if (paused) { (edit && edit.dirty) ? await playFromSelection() : doResume(); }
-    else if (edit && edit.dirty && editMode) { await playFromSelection(); }
+    if (!started) { await guard(startPlayback()); return; }
+    if (paused) { (edit && edit.dirty) ? await guard(playFromSelection()) : doResume(); }
+    else if (edit && edit.dirty && editMode) { await guard(playFromSelection()); }
     else { doPause(); }
     return;
   }
@@ -780,9 +861,7 @@ addEventListener('keydown', async (e) => {
   if (k in PIANO) {
     e.preventDefault();
     const semi = octave * 12 + PIANO[k];
-    if (semi < 120) setNote(NOTE_NAMES[semi % 12].length === 2 && NOTE_NAMES[semi % 12][1] === '#'
-      ? NOTE_NAMES[semi % 12] + Math.floor(semi / 12)
-      : NOTE_NAMES[semi % 12] + Math.floor(semi / 12));
+    if (semi < 120) setNote(NOTE_NAMES[semi % 12] + Math.floor(semi / 12));
   }
 });
 
@@ -792,7 +871,7 @@ addEventListener('keydown', async (e) => {
   const q = new URLSearchParams(location.search).get('song');
   if (!q) return;
   $('url').value = q;
-  loadUrl(q).catch(() => {});
+  guard(loadUrl(q));
 })();
 </script>
 </body>
