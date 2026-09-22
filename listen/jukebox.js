@@ -16,6 +16,7 @@ import { ChiptuneJsPlayer } from '../player/vendor/chiptune3/chiptune3.js';
 const FABLE = { model: 'Claude Fable 5', date: '2026-07-12' };
 const UNRECORDED = { model: 'model not recorded', date: '2026-09-08' };
 const OPUS55 = { model: 'Claude Opus 5.5', date: '2026-09-23' };
+const ASTRA = { model: 'Gpt-6 Astra', date: '2026-09-23' };
 const TRACKS = [
   { file: 'night_bus.it', title: 'Night Bus', note: 'laid-back groove · chords and flute', ...FABLE },
   { file: 'paper_hearts.it', title: 'Paper Hearts', note: 'chip-pop · liquid harp, no drums', ...FABLE },
@@ -28,6 +29,10 @@ const TRACKS = [
   { file: 'tide_pool_radio.it', title: 'Tide Pool Radio', note: 'D dorian drift · auto-panned arp, gliding bass', ...OPUS55 },
   { file: 'crypt_lanterns.it', title: 'Crypt Lanterns', note: '12/8 dungeon gallop · gated hats, phrygian turn', ...OPUS55 },
   { file: 'skyline_relay.it', title: 'Skyline Relay', note: 'G minor chase · octave bass, harmonised chorus', ...OPUS55 },
+  { file: 'pocket_tram.it', title: 'Pocket Tram', note: 'Bb major chip-pop · syncopated four-voice groove', ...ASTRA },
+  { file: 'copper_kite.it', title: 'Copper Kite', note: 'E Dorian chase · clipped 3+3+2 hook', ...ASTRA },
+  { file: 'moth_clock.it', title: 'Moth Clock', note: 'D minor chip waltz · winding melody, ticking drums', ...ASTRA },
+  { file: 'glass_harbor.it', title: 'Glass Harbor', note: 'F major nocturne · slow reflections, cadence echoes', ...ASTRA },
 ];
 const credit = (t) => `${t.model} · ${t.date}`;
 

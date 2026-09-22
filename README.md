@@ -68,6 +68,17 @@ corpus (canon shimmer, auto-panned arps, gated hats, octave-flicker stabs) with
 fully synthesized samples; shared articulation helpers live in
 [songs/opus55.js](songs/opus55.js). Each generator's header states its grid,
 phrase map and what it borrowed. They are in the jukebox playlist.
+
+The **Gpt-6 Astra batch** — [Pocket Tram](songs/pocket_tram.gen.js),
+[Copper Kite](songs/copper_kite.gen.js), [Moth Clock](songs/moth_clock.gen.js),
+and [Glass Harbor](songs/glass_harbor.gen.js) — adds four original pieces studied
+from the local Drozerix MOD/XM references: syncopated chip-pop, a Dorian chase,
+a minor-key waltz, and a spacious nocturne. Generators, portable JSON and compiled
+`demos/*.it` modules are included, with model credits in the module messages and
+playlist. See [the batch notes](docs/astra-batch.md) for reference pattern evidence,
+phrase maps, regeneration commands, revisions and verification. Listening remains
+unverified; structural checks and renders do not establish musical quality.
+
 `npm run build` compiles `songs/demo.json`; use `json2it.js` for other songs.
 Sample `volume` is a default, replaced by a note's explicit `vNN`. Lower event
 volumes or `mixvol` when balancing notes that already stamp their volume.
