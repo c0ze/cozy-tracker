@@ -86,6 +86,30 @@ as an amplitude ending. Recreate the envelope with volume and cuts, or deliberat
 use one-shots with known pitch-scaled tails. Long delays and sparse overlapping
 voicings are legitimate here; a universal one-row-echo rule would destroy the idea.
 
+## Further idioms (2026-09-23, used by the Opus 5.5 batch)
+
+Structural reads of four more modules. Across the corpus the XM arpeggio (0xy)
+is the most frequent effect (51k cells), then vibrato (4xy), set-volume (Cxx),
+tone portamento (3xx) and volume slides (Axy); the median order/pattern reuse
+ratio is 1.22, so most songs repeat surprisingly little.
+
+- **Peachy Chip, pattern 2:** channels 0-2 play one broken chord (1-3-5-8, a
+  note per row) offset by one row each: a canon shimmer from a single line.
+  Channel 7 restamps a 037/047 chord at v40/v20/v00 every four rows, and
+  channel 6 repeats it two rows later at half level. Pattern 9 alternates
+  A-4/A-5 bass on every other row with v40/v20 accents and stamps vibrato on
+  every held row of the lead while channel 4 shadows it one row later.
+- **October Chip, pattern 3:** an Am broken chord climbs and falls over two
+  octaves while its volume column carries a pan sweep (p00 to p3C in steps of
+  four rows); an 0CC octave flicker sustains on another channel.
+- **Necromancer's Castle, pattern 9:** hats are a long sample cut by EC2/EC4
+  on every other row — gated noise with body but no wash — under slow 3xx slides.
+- **Bakin' Blueberry Pie, pattern 5:** volume slides (A0C/A01) shape a held
+  note, and echo channels re-enter at v10 a row or two behind.
+
+The canon and echo copies only work where they do not sit a second away from
+the lead; the batch generators document where those tests failed and were cut.
+
 ## Apply the studies
 
 The [composition skill](../skills/mod-music/SKILL.md) routes to the authoring

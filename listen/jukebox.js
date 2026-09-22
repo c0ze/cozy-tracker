@@ -19,6 +19,10 @@ const TRACKS = [
   { file: 'siege_engine.it', title: 'Siege Engine', note: 'aggressive driver · war drums' },
   { file: 'lantern_walk.it', title: 'Lantern Walk', note: 'gentle chip · four-voice melodic study' },
   { file: 'siege_to_night.it', title: 'Siege → Night Bus', note: 'two songs + a generated bridge, one file' },
+  { file: 'peach_orchard.it', title: 'Peach Orchard', note: 'bright chip-pop · canon shimmer, pulsing stabs', group: 'Opus 5.5 batch' },
+  { file: 'tide_pool_radio.it', title: 'Tide Pool Radio', note: 'D dorian drift · auto-panned arp, gliding bass', group: 'Opus 5.5 batch' },
+  { file: 'crypt_lanterns.it', title: 'Crypt Lanterns', note: '12/8 dungeon gallop · gated hats, phrygian turn', group: 'Opus 5.5 batch' },
+  { file: 'skyline_relay.it', title: 'Skyline Relay', note: 'G minor chase · octave bass, harmonised chorus', group: 'Opus 5.5 batch' },
 ];
 
 const CSS = `
@@ -50,6 +54,8 @@ const CSS = `
 .jb .jb-track .idx { color:var(--dim,#8b93a7); font-size:.8rem; width:1.4em; text-align:right; }
 .jb .jb-track .t { font-weight:600; font-size:.92rem; }
 .jb .jb-track .n { color:var(--dim,#8b93a7); font-size:.78rem; }
+.jb .jb-group { padding:.7rem 1rem .25rem; color:var(--gold,#e0a458); font:600 .7rem/1 ui-monospace,monospace;
+  letter-spacing:.1em; text-transform:uppercase; border-top:1px solid var(--line,#2a3040); }
 .jb .jb-track .dur { margin-left:auto; color:var(--dim,#8b93a7); font-size:.8rem; }
 .jb .jb-eq { display:none; gap:2px; align-items:flex-end; height:13px; width:15px; }
 .jb .jb-track.playing .jb-eq { display:flex; }
@@ -98,7 +104,14 @@ export function mountJukebox(container, opts = {}) {
 
   const q = (sel) => container.querySelector(sel);
   const rows = q('.jb-rows');
+  const trackRows = []; // playlist rows by track index (group headings are not tracks)
   TRACKS.forEach((t, i) => {
+    if (t.group && t.group !== TRACKS[i - 1]?.group) {
+      const heading = document.createElement('div');
+      heading.className = 'jb-group';
+      heading.textContent = t.group;
+      rows.appendChild(heading);
+    }
     const row = document.createElement('div');
     row.className = 'jb-track';
     row.tabIndex = 0;
@@ -113,6 +126,7 @@ export function mountJukebox(container, opts = {}) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); playTrack(i); }
     });
     rows.appendChild(row);
+    trackRows.push(row);
   });
 
   let player = null, analyser = null, timeData = null, freqData = null;
@@ -122,7 +136,7 @@ export function mountJukebox(container, opts = {}) {
   const fmt = (s) => (isNaN(s) || s === undefined) ? '--:--' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const updateNow = () => { q('.jb-time').textContent = `${fmt(state === 'stopped' ? NaN : pos)} / ${fmt(dur || NaN)}`; };
   const markRows = () => {
-    [...rows.children].forEach((row, i) => {
+    trackRows.forEach((row, i) => {
       row.classList.toggle('current', i === cur);
       if (i === cur) row.setAttribute('aria-current', 'true'); else row.removeAttribute('aria-current');
       row.classList.toggle('playing', i === cur && (state === 'playing' || state === 'paused'));
@@ -155,7 +169,7 @@ export function mountJukebox(container, opts = {}) {
       player.onMetadata((m) => {
         if (disposed || state !== 'playing') return;
         dur = m.dur;
-        if (cur >= 0) rows.children[cur].querySelector('.dur').textContent = fmt(m.dur);
+        if (cur >= 0) trackRows[cur].querySelector('.dur').textContent = fmt(m.dur);
         updateNow();
       });
       player.onProgress((d) => { if (!disposed && state === 'playing') { pos = d.pos; updateNow(); } });

@@ -58,6 +58,14 @@ node tools/render.js build/lantern_walk.it
 ```
 
 Open `player/?song=../build/lantern_walk.it` on the local server to audition it.
+
+The **Opus 5.5 batch** — [Peach Orchard](songs/peach_orchard.gen.js),
+[Tide Pool Radio](songs/tide_pool_radio.gen.js), [Crypt Lanterns](songs/crypt_lanterns.gen.js)
+and [Skyline Relay](songs/skyline_relay.gen.js) — applies idioms from the Drozerix
+corpus (canon shimmer, auto-panned arps, gated hats, octave-flicker stabs) with
+fully synthesized samples; shared articulation helpers live in
+[songs/opus55.js](songs/opus55.js). Each generator's header states its grid,
+phrase map and what it borrowed. They are in the jukebox playlist.
 `npm run build` compiles `songs/demo.json`; use `json2it.js` for other songs.
 Sample `volume` is a default, replaced by a note's explicit `vNN`. Lower event
 volumes or `mixvol` when balancing notes that already stamp their volume.
