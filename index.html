@@ -73,6 +73,7 @@
   .demo { display:flex; align-items:center; justify-content:space-between; gap:.75rem;
     background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:.7rem .9rem; }
   .demo .meta small { color:var(--dim); display:block; font-size:.8rem; }
+  .demo .meta small.credit { color:var(--gold); font:600 .68rem/1.6 ui-monospace,monospace; letter-spacing:.04em; }
 
   footer { padding:2.4rem 0 3rem; color:var(--dim); font-size:.9rem; }
   footer a { color:var(--dim); text-decoration:underline; }
@@ -209,17 +210,21 @@
 
 <section id="demos">
   <div class="wrap">
-    <h2><span class="k">Hear it</span>Six modules, all generated.</h2>
-    <p class="lead">Every track was composed by the pipeline from public-domain samples, then rendered
+    <h2><span class="k">Hear it</span>Ten modules, all generated.</h2>
+    <p class="lead">Every track was composed by the pipeline from public-domain or synthesized samples, then rendered
       to a self-contained module. Open one in the browser player — pattern view, per-channel
-      solo/mute, oscilloscope.</p>
+      solo/mute, oscilloscope. Each is credited with the model that composed it and the date, so the list tracks progress.</p>
     <div class="demos">
-      <div class="demo"><div class="meta">Lantern Walk<small>gentle chip · new composition study</small></div><a class="btn" href="player/?song=../demos/lantern_walk.it">▶</a></div>
-      <div class="demo"><div class="meta">Night Bus<small>laid-back groove · chords and flute</small></div><a class="btn" href="player/?song=../demos/night_bus.it">▶</a></div>
-      <div class="demo"><div class="meta">First Light<small>melodic · key-change climax</small></div><a class="btn" href="player/?song=../demos/first_light.it">▶</a></div>
-      <div class="demo"><div class="meta">Siege Engine<small>aggressive driver</small></div><a class="btn" href="player/?song=../demos/siege_engine.it">▶</a></div>
-      <div class="demo"><div class="meta">Winter Orbit<small>sparse ambient</small></div><a class="btn" href="player/?song=../demos/winter_orbit.it">▶</a></div>
-      <div class="demo"><div class="meta">Paper Hearts<small>chip-pop</small></div><a class="btn" href="player/?song=../demos/paper_hearts.it">▶</a></div>
+      <div class="demo"><div class="meta">Peach Orchard<small>bright chip-pop</small><small class="credit">Claude Opus 5.5 · 2026-09-23</small></div><a class="btn" href="player/?song=../demos/peach_orchard.it" aria-label="open Peach Orchard in the player">▶</a></div>
+      <div class="demo"><div class="meta">Tide Pool Radio<small>D dorian drift</small><small class="credit">Claude Opus 5.5 · 2026-09-23</small></div><a class="btn" href="player/?song=../demos/tide_pool_radio.it" aria-label="open Tide Pool Radio in the player">▶</a></div>
+      <div class="demo"><div class="meta">Crypt Lanterns<small>12/8 dungeon gallop</small><small class="credit">Claude Opus 5.5 · 2026-09-23</small></div><a class="btn" href="player/?song=../demos/crypt_lanterns.it" aria-label="open Crypt Lanterns in the player">▶</a></div>
+      <div class="demo"><div class="meta">Skyline Relay<small>G minor chase</small><small class="credit">Claude Opus 5.5 · 2026-09-23</small></div><a class="btn" href="player/?song=../demos/skyline_relay.it" aria-label="open Skyline Relay in the player">▶</a></div>
+      <div class="demo"><div class="meta">Lantern Walk<small>gentle chip · composition study</small><small class="credit">model not recorded · 2026-09-08</small></div><a class="btn" href="player/?song=../demos/lantern_walk.it" aria-label="open Lantern Walk in the player">▶</a></div>
+      <div class="demo"><div class="meta">Night Bus<small>laid-back groove · chords and flute</small><small class="credit">Claude Fable 5 · 2026-07-12</small></div><a class="btn" href="player/?song=../demos/night_bus.it" aria-label="open Night Bus in the player">▶</a></div>
+      <div class="demo"><div class="meta">First Light<small>melodic · key-change climax</small><small class="credit">Claude Fable 5 · 2026-07-12</small></div><a class="btn" href="player/?song=../demos/first_light.it" aria-label="open First Light in the player">▶</a></div>
+      <div class="demo"><div class="meta">Siege Engine<small>aggressive driver</small><small class="credit">Claude Fable 5 · 2026-07-12</small></div><a class="btn" href="player/?song=../demos/siege_engine.it" aria-label="open Siege Engine in the player">▶</a></div>
+      <div class="demo"><div class="meta">Winter Orbit<small>sparse ambient</small><small class="credit">Claude Fable 5 · 2026-07-12</small></div><a class="btn" href="player/?song=../demos/winter_orbit.it" aria-label="open Winter Orbit in the player">▶</a></div>
+      <div class="demo"><div class="meta">Paper Hearts<small>chip-pop</small><small class="credit">Claude Fable 5 · 2026-07-12</small></div><a class="btn" href="player/?song=../demos/paper_hearts.it" aria-label="open Paper Hearts in the player">▶</a></div>
     </div>
   </div>
 </section>

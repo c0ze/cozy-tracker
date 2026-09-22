@@ -11,6 +11,10 @@ sample tuning, before borrowing patterns from the old demos.
   demo. `node tools/json2it.js songs/<name>.json` builds a specific song.
 - Validate music with lint, decoded pattern inspection and a libopenmpt render.
   State whether listening actually occurred. Lint/RMS do not establish musical quality.
+- **Frozen reference songs:** Night Bus, Paper Hearts, First Light, Winter Orbit,
+  Siege Engine and Siege → Night (the first batch, by Claude Fable 5) are kept
+  as-is for comparison. Do not edit their generators, JSON or modules. Shared
+  code changes must regenerate their JSON unchanged (the generator test checks this).
 - Optional `library/` assets are not checked in. Use synthesis for portable examples.
 - See [the audit](docs/song-audit.md) for remaining limitations and song studies.
   A source change does not update the prebuilt modules in `demos/`; those are
