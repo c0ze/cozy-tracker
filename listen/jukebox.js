@@ -17,6 +17,7 @@ const FABLE = { model: 'Claude Fable 5', date: '2026-07-12' };
 const UNRECORDED = { model: 'model not recorded', date: '2026-09-08' };
 const OPUS55 = { model: 'Claude Opus 5.5', date: '2026-09-23' };
 const ASTRA = { model: 'Gpt-6 Astra', date: '2026-09-23' };
+const GEMINI31 = { model: 'Gemini 3.1 Pro', date: '2026-09-23' };
 const TRACKS = [
   { file: 'night_bus.it', title: 'Night Bus', note: 'laid-back groove · chords and flute', ...FABLE },
   { file: 'paper_hearts.it', title: 'Paper Hearts', note: 'chip-pop · liquid harp, no drums', ...FABLE },
@@ -33,6 +34,8 @@ const TRACKS = [
   { file: 'copper_kite.it', title: 'Copper Kite', note: 'E Dorian chase · clipped 3+3+2 hook', ...ASTRA },
   { file: 'moth_clock.it', title: 'Moth Clock', note: 'D minor chip waltz · winding melody, ticking drums', ...ASTRA },
   { file: 'glass_harbor.it', title: 'Glass Harbor', note: 'F major nocturne · slow reflections, cadence echoes', ...ASTRA },
+  { file: 'neon_glow.it', title: 'Neon Glow', note: 'A minor upbeat chip · octave bass, J stabs, gated hats', ...GEMINI31 },
+  { file: 'pixel_rain.it', title: 'Pixel Rain', note: 'D minor atmospheric · canon shimmer', ...GEMINI31 },
 ];
 const credit = (t) => `${t.model} · ${t.date}`;
 
