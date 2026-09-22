@@ -43,7 +43,9 @@ must be set to "GitHub Actions" in the repo settings.
 
 ## Composing with an agent
 
-Read [the composition skill](skills/mod-music/SKILL.md). It covers motifs,
+Read [the composition skill](skills/mod-music/SKILL.md). For chip idioms (J stabs, echoes, canon
+shimmer, gated hats, bass register, loop seams) also read
+[the chiptune skill](skills/chiptune/SKILL.md). It covers motifs,
 question/answer phrases, rhythm, voice leading, articulation, effects and revision.
 The [song audit](docs/song-audit.md) explains the demonstrated defects and remaining
 limits; [corpus studies](docs/corpus-studies.md) separate evidence from recipes.
