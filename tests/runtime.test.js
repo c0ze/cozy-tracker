@@ -74,6 +74,29 @@ test('sections still loop when no transition is queued', () => {
   assert.deepEqual(jumps, [[1, 0], [1, 0]]);
 });
 
+test('a section the module loops itself (Bxx) is not re-seeked', () => {
+  const { music, progress, jumps } = adaptive({ loop: [1, 2] }, 'loop');
+  progress(2, 63);
+  progress(1, 0);
+  assert.equal(music.section, 'loop');
+  assert.deepEqual(jumps, [[1, 0]]);
+});
+
+test('a bridge that jumps into its destination is adopted without a seek', () => {
+  const { music, progress, jumps } = adaptive({ explore: [0, 1], combat: [2, 3], bridge: [4, 4] }, 'explore');
+  music.transitionTo('combat', { via: 'bridge' });
+  progress(1);
+  assert.deepEqual(jumps.at(-1), [4, 0]);
+  progress(4);
+  progress(4, 31);
+  progress(2, 0);
+  assert.equal(music.section, 'combat');
+  assert.deepEqual(jumps.at(-1), [4, 0]);
+  progress(3);
+  progress(2, 0); // and then loops natively too
+  assert.equal(jumps.length, 2);
+});
+
 test('browser sample resolution respects explicit synth volume, tuning and sustain-loop overrides', async () => {
   const html = fs.readFileSync(new URL('../player/index.html', import.meta.url), 'utf8');
   const source = html.slice(html.indexOf('async function resolveSample(def)'), html.indexOf('async function compileIt()'));

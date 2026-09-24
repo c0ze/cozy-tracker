@@ -13,7 +13,10 @@
  *     sections: { name: [firstOrder, lastOrder], ... },
  *     loop: "explore" }
  *
- * Sections loop themselves until a transition is requested. Layer control is
+ * Sections loop themselves until a transition is requested. A module may loop a
+ * section, or end a bridge in its destination, with its own Bxx jump: arriving
+ * at a section's first order on row 0 is adopted without a redundant seek.
+ * Layer control is
  * real engine-level channel muting (libopenmpt ext interactive interface),
  * so intensity changes are sample-accurate and free.
  */
@@ -133,11 +136,23 @@ export class CozyAdaptive {
     for (const cb of this._sectionCbs) cb(name);
   }
 
-  _advance() {
+  _advance(d) {
     if (!this._queue.length) return;
     // After entering a via section, play its complete range before advancing.
     this._nextBoundary = false;
-    this._jump(this._queue.shift());
+    const name = this._queue.shift();
+    if (this._landed(name, d)) this._adopt(name);
+    else this._jump(name);
+  }
+
+  // The module itself reached the start of `name` (a Bxx jump or the natural
+  // order flow). Seeking there again would replay the row just heard.
+  _landed(name, d) { return !!d && d.row === 0 && d.order === this._range(name)[0]; }
+
+  _adopt(name) {
+    this.section = name;
+    this._settling = null;
+    for (const cb of this._sectionCbs) cb(name);
   }
 
   _onProgress(d) {
@@ -161,11 +176,11 @@ export class CozyAdaptive {
     const sectionEnded = d.order > e || d.order < s ||
       (previousOrder === e && (d.order < previousOrder || rowWrapped));
     if (this._queue.length && this._nextBoundary) {
-      this._advance();
+      this._advance(d);
     } else if (sectionEnded) {
       // Finish the whole bridge, or loop the section with no pending request.
-      if (this._queue.length) this._advance();
-      else this._jump(this.section); // loop the section
+      if (this._queue.length) this._advance(d);
+      else if (!this._landed(this.section, d)) this._jump(this.section); // loop the section
     }
   }
 }
