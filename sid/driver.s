@@ -250,7 +250,16 @@ apply_row:
         rts
 
 apply_voice:
+        lda p_note,x            ; an empty row with no effect starting, going on or ending:
+        cmp #NO_NOTE            ; nothing changes (and a held voice stays held)
+        bne @apply
+        lda p_fx,x
+        ora v_fx,x
+        bne @apply
         lda p_ins,x
+        bpl @apply
+        rts
+@apply: lda p_ins,x
         bmi @fx
         sta v_ins,x
 @fx:    lda v_fx,x
