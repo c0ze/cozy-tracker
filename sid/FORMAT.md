@@ -18,6 +18,11 @@ Design follows Cadaver's "Building a musicroutine" (covert bitops rants, `music.
 | +9 | `start_order`: written by the host before `init`. |
 | +10 | `mute`: bit n silences voice n (bit 2 also silences effects). |
 | +11, +12 | `cur_order`, `cur_row`: the row playing now, for the host to read. |
+| +13 | `restart`: the host writes order + 1; the next `play` starts over from that order (as `init`). One byte, so safe while `play` runs in an IRQ. |
+
+## Sections
+
+`song.sid.sections` names song order positions, e.g. `{ "cleared": 15, "fallen": 16 }`: a jingle or a sting in the same song, started with `restart`. A section ends by jumping (`B`) where it should go on: back to the loop, or to a silent pattern that jumps to itself. `tools/sid-compile.js` reports them as driver orders (`sections` in its result).
 
 ## Frame
 

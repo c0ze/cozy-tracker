@@ -108,6 +108,15 @@ test('starts from any order (the player restarts init with start_order set)', as
   assert.equal(w.crsid_peek(result.org + 11), 1);
 });
 
+test('restart moves to another section on the next play', async () => {
+  const { w, result } = await run(song(), 20);
+  w.crsid_poke(result.org + 13, 1 + 1);            // order 1, while playing
+  const [f] = playFrames(w, result.org, 1);
+  assert.equal(voice(f.regs, 0).freq, freqOf('A-2'));
+  assert.equal(w.crsid_peek(result.org + 11), 1);
+  assert.equal(w.crsid_peek(result.org + 13), 0);
+});
+
 test('a sound effect borrows voice 3 and gives it back silent', async () => {
   const { w, result } = await run(song(), 10);
   playSfx(w, result.org, 0);

@@ -93,6 +93,7 @@ export function compileSid(song, { driver, org = DEFAULT_ORG }) {
   const driverEnd = symbols.get('vars_end');
   return {
     psid, prg, org, symbols, warnings, defines, orderMap: orderMap(song),
+    sections: Object.fromEntries(Object.entries(song.sid.sections ?? {}).map(([k, v]) => [k, orderMap(song)[v]])),
     stats: { driver: driverEnd - org, data: end - driverEnd, total: bytes.length, tracks: conv.tracks.length,
       patterns: conv.chunks.length, orders: conv.order.length, speed: conv.speed },
   };

@@ -30,6 +30,7 @@ start_order: .byte 0
 mute:   .byte 0
 cur_order: .byte 0
 cur_row: .byte 0
+restart: .byte 0                ; host: order + 1 to restart there on the next play
 
 ; A = effect number. Only stores the request; play starts it.
 sfx:    clc
@@ -68,7 +69,15 @@ init:   lda #0
         jsr load_order
         jmp fetch_voices
 
-play:   ldx tick
+play:   lda restart                 ; a section change from the host (one byte: no race)
+        beq @run
+        sec
+        sbc #1
+        sta start_order
+        lda #0
+        sta restart
+        jsr init
+@run:   ldx tick
         inx
         cpx speed
         bcc @tick

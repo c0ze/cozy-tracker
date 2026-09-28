@@ -74,6 +74,9 @@ export function validateSidSong(song) {
   if (sid.volume !== undefined) check(integer(sid.volume, 0, 15), 'volume must be 0..15');
   if (sid.loop !== undefined) check(integer(sid.loop, 0, (song.order?.length ?? 1) - 1), 'loop must be an order index');
   for (const k of ['author', 'released']) if (sid[k] !== undefined) check(typeof sid[k] === 'string', `${k} must be a string`);
+  if (sid.sections !== undefined)
+    check(object(sid.sections) && Object.entries(sid.sections).every(([k, v]) => /^[a-z_][a-z0-9_]*$/i.test(k) && integer(v, 0, (song.order?.length ?? 1) - 1)),
+      'sections must map names to order indices');
   const n = song.samples?.length ?? 0;
   if (sid.sfx !== undefined) {
     check(Array.isArray(sid.sfx) && sid.sfx.length <= 64, 'sfx must be a list of at most 64 effects');
