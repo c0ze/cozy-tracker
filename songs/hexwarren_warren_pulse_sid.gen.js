@@ -148,7 +148,7 @@ writeSong(import.meta.url, {
       { name: 'boss', instrument: I.blast, note: 'E-6', frames: 20, tail: 15 },
     ],
     // Stings in the same song, started by the game (sid/FORMAT.md, "Sections").
-    sections: { cleared: 15, fallen: 16 },
+    sections: { cleared: 15, fallen: 16, silence: 17 },
   },
   samples: [
     { name: 'pulse bass', sid: { adsr: [0, 6, 10, 3], wave: [['pulse']], pulse: PULSE_BASS } },
