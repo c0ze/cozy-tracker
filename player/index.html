@@ -49,8 +49,9 @@
     background: rgba(13,15,20,.85); border: 2px dashed var(--accent); border-radius: 8px;
     color: var(--accent); font-size: 1.1rem; pointer-events: none; }
   #meta { color: var(--dim); font-size: 11px; white-space: pre-wrap; max-height: 44px; overflow-y: auto; }
-  #instBar { display: none; }
-  #instBar.show { display: flex; }
+  #instBar, #sidBar { display: none; }
+  #instBar.show, #sidBar.show { display: flex; }
+  #sidStats { color: var(--dim); font-size: 11px; }
 </style>
 </head>
 <body>
@@ -71,7 +72,7 @@
   <label for="pitch">pitch</label><input type="range" id="pitch" min="0.5" max="2" step="0.05" value="1" style="width:60px">
   <input type="text" id="url" aria-label="song URL (.it or .json)" value="../songs/lantern_walk.json" style="flex:1; min-width:150px">
   <button id="loadUrl">Load</button>
-  <input type="file" id="file" aria-label="open module or json song" accept=".it,.xm,.mod,.s3m,.json" style="font-size:11px; max-width:180px">
+  <input type="file" id="file" aria-label="open module or json song" accept=".it,.xm,.mod,.s3m,.json,.sid" style="font-size:11px; max-width:180px">
 </div>
 
 <div class="panel row" id="instBar">
@@ -87,6 +88,16 @@
   <button id="dlIt">⬇ .it</button>
 </div>
 
+<div class="panel row" id="sidBar">
+  <label for="sidModel">SID</label>
+  <select id="sidModel"><option value="6581">6581</option><option value="8580">8580</option></select>
+  <span id="sidSfx" class="row"></span>
+  <span style="flex:1"></span>
+  <span id="sidStats"></span>
+  <button id="dlSid">⬇ .sid</button>
+  <button id="dlPrg" title="load address + driver + song, for a game">⬇ .prg</button>
+</div>
+
 <div class="panel"><div id="order"></div></div>
 <canvas id="scope"></canvas>
 <div id="patwrap">
@@ -100,12 +111,15 @@ import { ChiptuneJsPlayer } from './vendor/chiptune3/chiptune3.js';
 import itwriter from '/vendor/itwriter/index.js';
 import { synthesize } from '/tools/synth.js';
 import { readWav } from '/tools/wav.js';
+import { SidPlayer } from './sid-player.js';
+import { compileSid, report as sidReport, DRIVER_FILES } from '/tools/sid-compile.js';
 
 const $ = (id) => document.getElementById(id);
 const MIDDLE_C = 261.6256;
 
 // ---------- player state ----------
-let player = null, playerReady = null, started = false, paused = false, seeking = false;
+let player = null, started = false, paused = false, seeking = false;
+const players = { it: null, sid: null }; // created on first use; `player` is the active one
 let lastModule = null;    // { url } or { buf } of the last non-JSON module, for ▶ after ■
 let chScroll = 0;         // first visible channel when the pattern is wider than the view
 let song = null;          // worklet meta.song: channels[], patterns[{rows:[[cellStr,…]]}], orders[]
@@ -113,7 +127,7 @@ let orders = [];
 let cur = { order: 0, pattern: 0, row: 0, pos: 0 };
 let dispRow = 0;
 let vu = [], vuDisp = [];
-let analyser = null, scopeData = null;
+let scopeData = null;
 let chMute = [], chSolo = null; // per-channel mute + solo state
 
 const effMuted = (c) => chSolo !== null ? c !== chSolo : !!chMute[c];
@@ -137,20 +151,24 @@ const hue = (i) => (i * 47 + 190) % 360;
 const chColor = (i, l = 65, a = 1) => `hsla(${hue(i)}, 75%, ${l}%, ${a})`;
 const fmt = (s) => (s === undefined || isNaN(s)) ? '--:--' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-function initPlayer() {
-  const created = player = new ChiptuneJsPlayer({ repeatCount: -1 });
+function initPlayer(kind) {
+  const created = player = players[kind] = kind === 'sid' ? new SidPlayer() : new ChiptuneJsPlayer({ repeatCount: -1 });
   window.__player = player; // debug handle
-  playerReady = new Promise((resolve, reject) => {
-    player.onInitialized(resolve);
-    player.onError((e) => { if (e?.type === 'Init') reject(new Error('audio engine failed to start')); });
+  created.ready = new Promise((resolve, reject) => {
+    created.onInitialized(resolve);
+    created.onError((e) => { if (e?.type === 'Init') reject(new Error('audio engine failed to start')); });
   });
-  playerReady.catch(() => { if (player === created) { player = null; playerReady = null; } created.context.close().catch(() => {}); });
-  player.onInitialized(() => {
-    if (player.processNode) player.processNode.onprocessorerror = (e) => console.error('worklet processor died', e);
-    analyser = player.context.createAnalyser();
-    analyser.fftSize = 2048;
-    scopeData = new Float32Array(analyser.fftSize);
-    player.gain.connect(analyser);
+  created.ready.catch(() => {
+    if (players[kind] === created) players[kind] = null;
+    if (player === created) player = null;
+    created.context.close().catch(() => {});
+  });
+  created.onInitialized(() => {
+    if (created.processNode) created.processNode.onprocessorerror = (e) => console.error('worklet processor died', e);
+    created.analyser = created.context.createAnalyser();
+    created.analyser.fftSize = 2048;
+    scopeData = new Float32Array(created.analyser.fftSize);
+    created.gain.connect(created.analyser);
   });
   player.onError((e) => { $('meta').textContent = 'error: ' + (e?.type === 'ptr' ? 'not a playable module' : e?.type ?? 'unknown'); });
   player.onMetadata((meta) => {
@@ -384,6 +402,7 @@ function drawScope() {
   const ctx = scopeC.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
+  const analyser = player?.analyser;
   if (!analyser) return;
   analyser.getFloatTimeDomainData(scopeData);
   const grad = ctx.createLinearGradient(0, 0, w, 0);
@@ -432,9 +451,63 @@ async function resolveSample(def) {
 }
 async function compileIt() {
   const j = edit.json;
+  if (isSidSong(j)) return compileSidSong();
   const samples = await Promise.all((j.samples || []).map(resolveSample));
   return itwriter({ ...j, samples });
 }
+
+// ---------- SID songs (tools/sid-compile.js in the browser) ----------
+let sidDriver = null, sidResult = null;
+async function compileSidSong() {
+  sidDriver ??= (await Promise.all(DRIVER_FILES.map(async (f) => (await fetchOk(`/sid/${f}`)).text()))).join('\n');
+  const j = edit.json;
+  sidResult = compileSid(j, { driver: sidDriver });
+  $('sidStats').textContent = sidReport(sidResult).split('\n')[0] + (sidResult.warnings.size ? ` · ${sidResult.warnings.size} warnings` : '');
+  $('sidStats').title = sidReport(sidResult);
+  return { psid: sidResult.psid, org: sidResult.org, orderMap: sidResult.orderMap, meta: sidMeta(j) };
+}
+// What libopenmpt's metadata would say, built from the JSON (the pattern view reads it).
+function sidMeta(j) {
+  const nCh = Math.max(...j.patterns.map((p) => p.channels.length));
+  const names = j.channelnames || {};
+  const rows = j.order.reduce((n, p) => n + j.patterns[p].rows, 0);
+  return {
+    title: j.title, tracker: `SID ${j.sid.model || '6581'}`, totalPatterns: j.patterns.length, totalOrders: j.order.length,
+    dur: (rows * (sidResult?.stats.speed ?? 6)) / 50, message: j.message,
+    song: {
+      channels: [...Array(nCh)].map((_, c) => names[c] ?? `voice ${c + 1}`),
+      orders: j.order.map((pat) => ({ pat })),
+      patterns: j.patterns.map((p) => ({ rows: [...Array(p.rows)].map((_, r) => [...Array(nCh)].map((_, c) => cellString(p.channels[c]?.[r]))) })),
+    },
+  };
+}
+function updateSidBar() {
+  const sid = edit && isSidSong(edit.json);
+  $('sidBar').classList.toggle('show', !!sid || !!lastModule?.sid);
+  $('dlSid').disabled = $('dlPrg').disabled = !sid;
+  $('dlIt').disabled = !!sid;
+  $('sidSfx').innerHTML = '';
+  if (!sid) return;
+  $('sidModel').value = edit.json.sid.model || '6581';
+  (edit.json.sid.sfx || []).forEach((e, i) => {
+    const b = document.createElement('button');
+    b.textContent = `♪ ${e.name}`;
+    b.title = `sound effect ${i} on voice 3`;
+    b.onclick = () => player?.playSfx?.(i);
+    $('sidSfx').appendChild(b);
+  });
+}
+$('sidModel').onchange = () => player?.setModel?.(+$('sidModel').value);
+$('dlSid').onclick = () => guard((async () => {
+  if (!edit) return;
+  const { psid } = await compileSidSong();
+  download(new Blob([psid]), (edit.json.title || 'song').replace(/\W+/g, '_') + '.sid');
+})());
+$('dlPrg').onclick = () => guard((async () => {
+  if (!edit) return;
+  await compileSidSong();
+  download(new Blob([sidResult.prg]), (edit.json.title || 'song').replace(/\W+/g, '_') + '.prg');
+})());
 
 // ---------- edit display sync (local cell formatting, libopenmpt-style) ----------
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -517,7 +590,7 @@ function setNote(noteName) {
   const chn = ensureChannel(pat, cursor.ch);
   const old = chn[cursor.row] || {};
   chn[cursor.row] = noteName === '==' ? { note: '==' }
-    : { ...old, note: noteName, instrument: curInst, vol: old.vol || 'v48' };
+    : { ...old, note: noteName, instrument: curInst, ...(isSidSong(edit.json) ? {} : { vol: old.vol || 'v48' }) };
   edit.dirty = true;
   syncCell(viewPattern(), cursor.row, cursor.ch);
   if (noteName !== '==') auditionNote(noteName, curInst, chn[cursor.row].vol);
@@ -660,15 +733,20 @@ function download(blob, name) {
 }
 
 // ---------- loading ----------
-async function ensurePlayer() {
+async function ensurePlayer(kind = playerKind()) {
   if (!window.isSecureContext || !('audioWorklet' in (window.AudioContext?.prototype ?? {}))) {
     $('meta').innerHTML = `⚠ audio needs HTTPS — try <a href="https://${location.host}${location.pathname}">https://${location.host}</a>`;
     throw Object.assign(new Error('secure context required for AudioWorklet'), { shown: true });
   }
-  if (!player) initPlayer();
+  if (player && player !== players[kind]) { player.stop(); started = false; }
+  if (players[kind]) player = window.__player = players[kind];
+  else initPlayer(kind);
   if (player.context.state === 'suspended') await player.context.resume();
-  await playerReady;
+  await player.ready;
 }
+// The engine the loaded song needs: SID songs (a "sid" object) and .sid files play in cRSID.
+const isSidSong = (json) => json?.sid !== undefined;
+const playerKind = () => (edit ? isSidSong(edit.json) : lastModule?.sid) ? 'sid' : 'it';
 // Report failures in #meta instead of leaving the UI silently stuck.
 const guard = (promise) => Promise.resolve(promise).catch((e) => {
   if (!e?.shown) $('meta').textContent = 'error: ' + (e?.message ?? e);
@@ -679,7 +757,7 @@ async function fetchOk(url) {
   return res;
 }
 async function loadJsonSong(json, url) {
-  await ensurePlayer();
+  await ensurePlayer(isSidSong(json) ? 'sid' : 'it');
   const previous = { edit, curInst };
   edit = { json, url, dirty: false };
   curInst = 0;
@@ -694,6 +772,7 @@ async function loadJsonSong(json, url) {
   started = true; paused = false;
   refreshInstruments();
   updateEditState();
+  updateSidBar();
 }
 const confirmDiscard = () => !edit?.dirty || confirm('Discard unsaved edits?');
 async function loadUrl(url) {
@@ -703,18 +782,27 @@ async function loadUrl(url) {
 }
 async function loadBuffer(buf, name = '') {
   if (/\.json$/i.test(name)) return loadJsonSong(JSON.parse(new TextDecoder().decode(buf)), name);
-  await ensurePlayer();
+  const sid = /\.sid$/i.test(name) || /^[PR]SID/.test(new TextDecoder('latin1').decode(new Uint8Array(buf, 0, 4)));
+  await ensurePlayer(sid ? 'sid' : 'it');
   edit = null; editMode = false; chScroll = 0;
-  lastModule = { buf };
-  player.play(buf);
+  lastModule = { buf, sid };
+  player.play(sid ? sidFile(buf) : buf);
   started = true; paused = false;
   updateEditState();
+  updateSidBar();
+}
+// Another PSID file: no patterns to show, so no position either.
+function sidFile(buf) {
+  const psid = new Uint8Array(buf.slice(0));
+  const text = (at) => new TextDecoder('latin1').decode(psid.slice(at, at + 32)).replace(/\0.*$/s, '');
+  const tracker = ['PSID', text(0x36), text(0x56)].filter(Boolean).join(' · ');
+  return { psid, org: null, meta: { title: text(0x16), tracker, totalPatterns: 0, totalOrders: 0, song: { channels: [], patterns: [], orders: [] } } };
 }
 // ▶ after ■ replays what is loaded (including unsaved edits); it only
 // fetches the URL box when nothing has been loaded yet.
 async function startPlayback() {
   if (edit) return playFromSelection();
-  if (lastModule) { await ensurePlayer(); player.play(lastModule.buf); started = true; paused = false; return; }
+  if (lastModule) { await ensurePlayer(); player.play(lastModule.sid ? sidFile(lastModule.buf) : lastModule.buf); started = true; paused = false; return; }
   return loadUrl($('url').value);
 }
 $('loadUrl').onclick = () => { if (confirmDiscard()) guard(loadUrl($('url').value)); };

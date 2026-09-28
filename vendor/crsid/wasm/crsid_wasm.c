@@ -46,6 +46,13 @@ EXPORT(crsid_render) short *crsid_render(int n)
 	return out;
 }
 
+// Runs the loaded tune's init routine again on the RAM as it is now (after crsid_poke), with
+// the C64 reset but the file not reloaded: the player uses it to start from an order.
+EXPORT(crsid_restart) void crsid_restart(void) { cRSID_initSIDtune(c64, c64->SIDheader, 1); }
+
+// Voice v's envelope level (0-255), for level meters.
+EXPORT(crsid_env) int crsid_env(int v) { return c64->SID[1].EnvelopeCounter[(v % 3) * 7]; }
+
 // 6581 or 8580, overriding the file's header.
 EXPORT(crsid_set_model) void crsid_set_model(int model) { c64->SID[1].ChipModel = (unsigned short)model; }
 

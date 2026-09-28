@@ -99,6 +99,15 @@ test('follows the order list, jumps and loops', async () => {
   assert.equal(w.crsid_peek(0x100c), 0);                    // cur_row
 });
 
+test('starts from any order (the player restarts init with start_order set)', async () => {
+  const { w, result } = await run(song(), 5);
+  w.crsid_poke(result.org + 9, 1);
+  w.crsid_restart();
+  const [f] = playFrames(w, result.org, 1);
+  assert.equal(voice(f.regs, 0).freq, freqOf('A-2'));
+  assert.equal(w.crsid_peek(result.org + 11), 1);
+});
+
 test('a sound effect borrows voice 3 and gives it back silent', async () => {
   const { w, result } = await run(song(), 10);
   playSfx(w, result.org, 0);

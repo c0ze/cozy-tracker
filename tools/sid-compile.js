@@ -8,7 +8,7 @@
 import { assemble } from './asm6502.js';
 import { assertSong } from './validate-song.js';
 import { frequencyTable, instrumentTables, sfxTables } from './sid-data.js';
-import { convertSong } from './sid-tracks.js';
+import { convertSong, orderMap } from './sid-tracks.js';
 
 export const DRIVER_FILES = ['driver.s', 'voice.s'];
 export const DEFAULT_ORG = 0x1000;
@@ -92,7 +92,7 @@ export function compileSid(song, { driver, org = DEFAULT_ORG }) {
   prg.set(bytes, 2);
   const driverEnd = symbols.get('vars_end');
   return {
-    psid, prg, org, symbols, warnings, defines,
+    psid, prg, org, symbols, warnings, defines, orderMap: orderMap(song),
     stats: { driver: driverEnd - org, data: end - driverEnd, total: bytes.length, tracks: conv.tracks.length,
       patterns: conv.chunks.length, orders: conv.order.length, speed: conv.speed },
   };
