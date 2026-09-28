@@ -158,7 +158,7 @@ test('generators reproduce checked-in JSON without the optional sample library',
     fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
     for (const file of fs.readdirSync(sourceDir)) if (/\.(js|json)$/.test(file))
       fs.copyFileSync(new URL(file, sourceDir), path.join(dir, 'songs', file));
-    for (const file of ['merge.js', 'validate-song.js'])
+    for (const file of ['merge.js', 'validate-song.js', 'validate-sid.js'])
       fs.copyFileSync(new URL(`../tools/${file}`, import.meta.url), path.join(dir, 'tools', file));
     for (const file of fs.readdirSync(sourceDir).filter(f => f.endsWith('.gen.js')).sort()) {
       const result = spawnSync(process.execPath, [path.join(dir, 'songs', file)], { cwd: dir, encoding: 'utf8' });

@@ -1,9 +1,12 @@
 // Validate authoring mistakes that the binary writer would otherwise coerce or drop.
+import { validateSidInstrument, validateSidSong } from './validate-sid.js';
+
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const integer = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 export const isNote = (v) => typeof v === 'string' && /^(?:[A-G]-|[ACDFG]#)[0-9]$/.test(v);
 
-export function validateSong(song) {
+// opts.sid: accept SID instruments (tools/json2sid.js); the IT and MOD writers cannot play them.
+export function validateSong(song, opts = {}) {
   const errors = [];
   const check = (ok, where, message) => { if (!ok) errors.push(`${where}: ${message}`); };
   if (!object(song)) return ['song must be an object'];
@@ -30,8 +33,12 @@ export function validateSong(song) {
   song.samples.forEach((s, i) => {
     const at = `samples[${i}]`;
     if (!object(s)) { errors.push(`${at}: expected sample object`); return; }
-    check([s.synth, s.file, s.channels, s.buffer].filter(v => v !== undefined).length === 1,
-      at, 'choose exactly one of synth, file, channels or buffer');
+    check([s.synth, s.file, s.channels, s.buffer, s.sid].filter(v => v !== undefined).length === 1,
+      at, 'choose exactly one of synth, file, channels, buffer or sid');
+    if (s.sid !== undefined) {
+      if (opts.sid) errors.push(...validateSidInstrument(s.sid, at));
+      else errors.push(`${at}: sid instruments play only through tools/json2sid.js`);
+    }
     if (s.file !== undefined) check(typeof s.file === 'string' && s.file.length > 0, at, 'file must be a path');
     if (s.name !== undefined) check(typeof s.name === 'string', at, 'name must be a string');
     if (s.synth !== undefined) {
@@ -104,10 +111,14 @@ export function validateSong(song) {
       if (a.loop !== undefined) check(Object.hasOwn(a.sections, a.loop), 'adaptive.loop', 'unknown section');
     }
   }
+  if (song.sid !== undefined) {
+    if (opts.sid) errors.push(...validateSidSong(song));
+    else errors.push('sid: SID songs build with tools/json2sid.js');
+  }
   return errors;
 }
 
-export function assertSong(song) {
-  const errors = validateSong(song);
+export function assertSong(song, opts) {
+  const errors = validateSong(song, opts);
   if (errors.length) throw new Error(`Invalid song:\n${errors.join('\n')}`);
 }
