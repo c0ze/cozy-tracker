@@ -145,7 +145,8 @@ test('special IT volume slides apply on tick zero', () => {
 test('all checked-in song sources satisfy the binary format contract', () => {
   const dir = new URL('../songs/', import.meta.url);
   for (const file of fs.readdirSync(dir).filter(f => f.endsWith('.json'))) {
-    assert.deepEqual(validateSong(JSON.parse(fs.readFileSync(new URL(file, dir)))), [], file);
+    const song = JSON.parse(fs.readFileSync(new URL(file, dir)));
+    assert.deepEqual(validateSong(song, { sid: song.sid !== undefined }), [], file);
   }
 });
 
